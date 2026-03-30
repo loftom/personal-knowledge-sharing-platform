@@ -1,0 +1,34 @@
+﻿# OS / IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.out
+*.err
+frontend-dev.out.log
+frontend-dev.err.log
+backend-dev.out.log
+backend-dev.err.log
+
+# Runtime data
+uploads/
+data/
+backend/data/
+
+# Build outputs
+frontend/dist/
+frontend/node_modules/
+backend/target/
+
+# Temp payloads
+*_payload.json
+reg_payload.json
+login_payload.json
+publish_payload.json
+draft_payload.json
+
+# Local test artifacts
+test_upload.txt
