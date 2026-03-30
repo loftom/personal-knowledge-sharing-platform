@@ -4,7 +4,7 @@
       <div>
         <div class="section-tag">管理员后台</div>
         <h1>后台管理中心</h1>
-        <p>管理员功能独立于普通用户前台，集中承接一期审核与分类标签维护。</p>
+        <p>管理员功能独立于普通用户前台，集中承接内容审核、分类标签维护与用户兴趣画像查看。</p>
       </div>
     </section>
 
@@ -19,6 +19,9 @@
       <el-tab-pane label="审核台" name="audit">
         <AdminAuditPage />
       </el-tab-pane>
+      <el-tab-pane label="用户偏好" name="preference">
+        <AdminPreferencePage />
+      </el-tab-pane>
       <el-tab-pane label="分类标签" name="taxonomy">
         <TaxonomyManage />
       </el-tab-pane>
@@ -30,6 +33,7 @@
 import { computed, ref } from 'vue';
 import TaxonomyManage from './TaxonomyManage.vue';
 import AdminAuditPage from './AdminAuditPage.vue';
+import AdminPreferencePage from './AdminPreferencePage.vue';
 
 const isAdmin = computed(() => localStorage.getItem('role') === 'ADMIN');
 const activeTab = ref('audit');
@@ -45,7 +49,7 @@ const activeTab = ref('audit');
   padding: 28px;
   border-radius: 30px;
   color: #fff;
-  background: linear-gradient(135deg, #0f172a 0%, #7c3aed 52%, #0f766e 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 46%, #0f766e 100%);
 }
 
 .admin-hero h1 {

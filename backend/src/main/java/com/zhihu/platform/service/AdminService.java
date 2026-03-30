@@ -5,15 +5,21 @@ import com.zhihu.platform.common.AppException;
 import com.zhihu.platform.domain.dto.Phase2Dtos;
 import com.zhihu.platform.domain.entity.AuditLog;
 import com.zhihu.platform.domain.entity.Content;
+import com.zhihu.platform.domain.entity.Tag;
 import com.zhihu.platform.domain.entity.User;
 import com.zhihu.platform.domain.mapper.AuditLogMapper;
 import com.zhihu.platform.domain.mapper.ContentMapper;
+import com.zhihu.platform.domain.mapper.TagMapper;
 import com.zhihu.platform.domain.mapper.UserMapper;
 import com.zhihu.platform.security.UserContext;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class AdminService {
@@ -23,17 +29,23 @@ public class AdminService {
     private final NotificationService notificationService;
     private final PointService pointService;
     private final UserMapper userMapper;
+    private final BehaviorService behaviorService;
+    private final TagMapper tagMapper;
 
     public AdminService(ContentMapper contentMapper,
                         AuditLogMapper auditLogMapper,
                         NotificationService notificationService,
                         PointService pointService,
-                        UserMapper userMapper) {
+                        UserMapper userMapper,
+                        BehaviorService behaviorService,
+                        TagMapper tagMapper) {
         this.contentMapper = contentMapper;
         this.auditLogMapper = auditLogMapper;
         this.notificationService = notificationService;
         this.pointService = pointService;
         this.userMapper = userMapper;
+        this.behaviorService = behaviorService;
+        this.tagMapper = tagMapper;
     }
 
     public List<Content> pendingList() {
@@ -66,6 +78,45 @@ public class AdminService {
                 .eq(Content::getStatus, "PENDING_REVIEW")
                 .eq(Content::getType, "QUESTION")));
         return overview;
+    }
+
+    public List<Phase2Dtos.UserPreferenceView> userPreferences() {
+        requireAdmin();
+        List<User> users = userMapper.selectList(new LambdaQueryWrapper<User>().orderByAsc(User::getId));
+        List<Tag> tags = tagMapper.selectList(new LambdaQueryWrapper<Tag>().orderByAsc(Tag::getId));
+        Map<Long, String> tagNameMap = tags.stream().collect(Collectors.toMap(Tag::getId, Tag::getName));
+
+        List<Phase2Dtos.UserPreferenceView> result = new ArrayList<>();
+        for (User user : users) {
+            Map<Long, Double> rawPreference = behaviorService.buildUserTagPreference(user.getId());
+            List<Phase2Dtos.UserPreferenceTag> preferenceTags = rawPreference.entrySet().stream()
+                    .filter(entry -> entry.getValue() != null && entry.getValue() > 0)
+                    .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                    .limit(8)
+                    .map(entry -> {
+                        Phase2Dtos.UserPreferenceTag tag = new Phase2Dtos.UserPreferenceTag();
+                        tag.setTagId(entry.getKey());
+                        tag.setTagName(tagNameMap.getOrDefault(entry.getKey(), "标签 " + entry.getKey()));
+                        tag.setWeight(entry.getValue());
+                        return tag;
+                    })
+                    .toList();
+
+            double totalWeight = rawPreference.values().stream().mapToDouble(Double::doubleValue).sum();
+            Phase2Dtos.UserPreferenceView item = new Phase2Dtos.UserPreferenceView();
+            item.setUserId(user.getId());
+            item.setUsername(user.getUsername());
+            item.setNickname(user.getNickname());
+            item.setDisplayName(resolveDisplayName(user));
+            item.setRole(user.getRole());
+            item.setTotalWeight(totalWeight);
+            item.setTagCount(preferenceTags.size());
+            item.setPreferences(preferenceTags);
+            result.add(item);
+        }
+
+        result.sort(Comparator.comparing(Phase2Dtos.UserPreferenceView::getTotalWeight, Comparator.nullsLast(Double::compareTo)).reversed());
+        return result;
     }
 
     public void approve(Long contentId) {
@@ -136,6 +187,13 @@ public class AdminService {
         if (user == null) {
             return "用户 " + authorId;
         }
+        return resolveDisplayName(user);
+    }
+
+    private String resolveDisplayName(User user) {
+        if (user == null) {
+            return "匿名用户";
+        }
         String nickname = user.getNickname();
         if (nickname != null && !nickname.trim().isEmpty() && !nickname.trim().matches("^[?]+$")) {
             return nickname.trim();
@@ -144,6 +202,6 @@ public class AdminService {
         if (username != null && !username.trim().isEmpty()) {
             return username.trim();
         }
-        return "用户 " + authorId;
+        return "用户 " + user.getId();
     }
 }

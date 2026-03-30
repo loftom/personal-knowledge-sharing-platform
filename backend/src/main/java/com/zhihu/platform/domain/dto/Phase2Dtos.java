@@ -203,4 +203,23 @@ public class Phase2Dtos {
         private List<TrendPoint> trends;
         private List<PointLogItem> recentPointLogs;
     }
+
+    @Data
+    public static class UserPreferenceTag {
+        private Long tagId;
+        private String tagName;
+        private Double weight;
+    }
+
+    @Data
+    public static class UserPreferenceView {
+        private Long userId;
+        private String username;
+        private String nickname;
+        private String displayName;
+        private String role;
+        private Double totalWeight;
+        private Integer tagCount;
+        private List<UserPreferenceTag> preferences;
+    }
 }

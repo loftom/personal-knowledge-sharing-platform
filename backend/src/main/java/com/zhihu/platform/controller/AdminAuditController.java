@@ -34,6 +34,11 @@ public class AdminAuditController {
         return ApiResponse.ok(adminService.overview());
     }
 
+    @GetMapping("/preferences")
+    public ApiResponse<List<Phase2Dtos.UserPreferenceView>> preferences() {
+        return ApiResponse.ok(adminService.userPreferences());
+    }
+
     @PostMapping("/{contentId}/approve")
     public ApiResponse<Void> approve(@PathVariable Long contentId) {
         adminService.approve(contentId);
