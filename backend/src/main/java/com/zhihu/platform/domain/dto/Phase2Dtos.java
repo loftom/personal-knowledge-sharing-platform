@@ -108,6 +108,12 @@ public class Phase2Dtos {
     }
 
     @Data
+    public static class ResetPasswordRequest {
+        @NotBlank
+        private String newPassword;
+    }
+
+    @Data
     public static class CreateCategoryRequest {
         @NotBlank
         private String name;

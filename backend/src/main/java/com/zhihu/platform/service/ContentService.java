@@ -84,9 +84,11 @@ public class ContentService {
         content.setUpdatedAt(LocalDateTime.now());
 
         String requestedStatus = request.getStatus();
-        String hitWord = auditService.hitSensitiveWord(request.getTitle() + " " + request.getBody());
+        String hitWord = auditService.hitSensitiveWord(request.getTitle() + " " + request.getSummary() + " " + request.getBody());
         if ("DRAFT".equalsIgnoreCase(requestedStatus)) {
             content.setStatus("DRAFT");
+        } else if (hitWord != null) {
+            content.setStatus("REJECTED");
         } else {
             content.setStatus("PENDING_REVIEW");
         }
@@ -130,9 +132,12 @@ public class ContentService {
 
         String requestedStatus = request.getStatus();
         String oldStatus = db.getStatus();
-        String hitWord = auditService.hitSensitiveWord(request.getTitle() + " " + request.getBody());
+        String hitWord = auditService.hitSensitiveWord(request.getTitle() + " " + request.getSummary() + " " + request.getBody());
         if ("DRAFT".equalsIgnoreCase(requestedStatus)) {
             db.setStatus("DRAFT");
+        } else if (hitWord != null) {
+            db.setStatus("REJECTED");
+            db.setPublishedAt(null);
         } else if (!"OFFLINE".equals(oldStatus) && !"PUBLISHED".equals(oldStatus)) {
             db.setStatus("PENDING_REVIEW");
             db.setPublishedAt(null);

@@ -1,18 +1,41 @@
 package com.zhihu.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.zhihu.platform.common.AppException;
 import com.zhihu.platform.domain.dto.ContentDtos;
 import com.zhihu.platform.domain.dto.Phase2Dtos;
-import com.zhihu.platform.domain.entity.*;
-import com.zhihu.platform.domain.mapper.*;
-import com.zhihu.platform.common.AppException;
+import com.zhihu.platform.domain.entity.BadgeUser;
+import com.zhihu.platform.domain.entity.Comment;
+import com.zhihu.platform.domain.entity.Content;
+import com.zhihu.platform.domain.entity.FavoriteRecord;
+import com.zhihu.platform.domain.entity.FollowRelation;
+import com.zhihu.platform.domain.entity.LikeRecord;
+import com.zhihu.platform.domain.entity.Notification;
+import com.zhihu.platform.domain.entity.PointAccount;
+import com.zhihu.platform.domain.entity.PointLog;
+import com.zhihu.platform.domain.entity.QaAnswer;
+import com.zhihu.platform.domain.entity.User;
+import com.zhihu.platform.domain.entity.UserBehaviorEvent;
+import com.zhihu.platform.domain.mapper.BadgeUserMapper;
+import com.zhihu.platform.domain.mapper.CommentMapper;
+import com.zhihu.platform.domain.mapper.ContentMapper;
+import com.zhihu.platform.domain.mapper.FavoriteRecordMapper;
+import com.zhihu.platform.domain.mapper.FollowRelationMapper;
+import com.zhihu.platform.domain.mapper.LikeRecordMapper;
+import com.zhihu.platform.domain.mapper.NotificationMapper;
+import com.zhihu.platform.domain.mapper.PointAccountMapper;
+import com.zhihu.platform.domain.mapper.PointLogMapper;
+import com.zhihu.platform.domain.mapper.QaAnswerMapper;
+import com.zhihu.platform.domain.mapper.UserBehaviorEventMapper;
+import com.zhihu.platform.domain.mapper.UserMapper;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,17 +46,39 @@ public class ProfileService {
     private final FavoriteRecordMapper favoriteRecordMapper;
     private final FollowRelationMapper followRelationMapper;
     private final CommentMapper commentMapper;
+    private final LikeRecordMapper likeRecordMapper;
+    private final NotificationMapper notificationMapper;
+    private final UserBehaviorEventMapper userBehaviorEventMapper;
+    private final PointAccountMapper pointAccountMapper;
+    private final PointLogMapper pointLogMapper;
+    private final BadgeUserMapper badgeUserMapper;
+    private final QaAnswerMapper qaAnswerMapper;
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public ProfileService(UserMapper userMapper,
                           ContentMapper contentMapper,
                           FavoriteRecordMapper favoriteRecordMapper,
                           FollowRelationMapper followRelationMapper,
-                          CommentMapper commentMapper) {
+                          CommentMapper commentMapper,
+                          LikeRecordMapper likeRecordMapper,
+                          NotificationMapper notificationMapper,
+                          UserBehaviorEventMapper userBehaviorEventMapper,
+                          PointAccountMapper pointAccountMapper,
+                          PointLogMapper pointLogMapper,
+                          BadgeUserMapper badgeUserMapper,
+                          QaAnswerMapper qaAnswerMapper) {
         this.userMapper = userMapper;
         this.contentMapper = contentMapper;
         this.favoriteRecordMapper = favoriteRecordMapper;
         this.followRelationMapper = followRelationMapper;
         this.commentMapper = commentMapper;
+        this.likeRecordMapper = likeRecordMapper;
+        this.notificationMapper = notificationMapper;
+        this.userBehaviorEventMapper = userBehaviorEventMapper;
+        this.pointAccountMapper = pointAccountMapper;
+        this.pointLogMapper = pointLogMapper;
+        this.badgeUserMapper = badgeUserMapper;
+        this.qaAnswerMapper = qaAnswerMapper;
     }
 
     public Phase2Dtos.PersonalSpaceResponse space(Long userId) {
@@ -118,10 +163,7 @@ public class ProfileService {
     }
 
     public Phase2Dtos.UserSimple updateNickname(Long userId, String nickname) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new AppException("User not found");
-        }
+        User user = requireUser(userId);
         user.setNickname(nickname.trim());
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
@@ -131,6 +173,77 @@ public class ProfileService {
         simple.setUsername(user.getUsername());
         simple.setNickname(user.getNickname());
         return simple;
+    }
+
+    public void resetPassword(Long userId, String newPassword) {
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            throw new AppException("新密码长度不能少于 6 位");
+        }
+        User user = requireUser(userId);
+        user.setPasswordHash(encoder.encode(newPassword.trim()));
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    public void deactivateAccount(Long userId) {
+        User user = requireUser(userId);
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            throw new AppException("管理员账号不支持在前台直接注销");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<Content> contents = contentMapper.selectList(new LambdaQueryWrapper<Content>()
+                .eq(Content::getAuthorId, userId));
+        for (Content content : contents) {
+            content.setStatus("OFFLINE");
+            content.setVisibility("PRIVATE");
+            content.setUpdatedAt(now);
+            contentMapper.updateById(content);
+        }
+
+        List<Comment> comments = commentMapper.selectList(new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getUserId, userId));
+        for (Comment comment : comments) {
+            comment.setBody("该评论已随账号注销而移除");
+            comment.setStatus(0);
+            commentMapper.updateById(comment);
+        }
+
+        List<QaAnswer> answers = qaAnswerMapper.selectList(new LambdaQueryWrapper<QaAnswer>()
+                .eq(QaAnswer::getUserId, userId));
+        for (QaAnswer answer : answers) {
+            answer.setBody("该回答已随账号注销而移除");
+            answer.setStatus(0);
+            answer.setUpdatedAt(now);
+            qaAnswerMapper.updateById(answer);
+        }
+
+        favoriteRecordMapper.delete(new LambdaQueryWrapper<FavoriteRecord>().eq(FavoriteRecord::getUserId, userId));
+        likeRecordMapper.delete(new LambdaQueryWrapper<LikeRecord>().eq(LikeRecord::getUserId, userId));
+        followRelationMapper.delete(new LambdaQueryWrapper<FollowRelation>()
+                .eq(FollowRelation::getFollowerUserId, userId)
+                .or()
+                .eq(FollowRelation::getTargetUserId, userId));
+        notificationMapper.delete(new LambdaQueryWrapper<Notification>().eq(Notification::getUserId, userId));
+        userBehaviorEventMapper.delete(new LambdaQueryWrapper<UserBehaviorEvent>().eq(UserBehaviorEvent::getUserId, userId));
+        pointAccountMapper.delete(new LambdaQueryWrapper<PointAccount>().eq(PointAccount::getUserId, userId));
+        pointLogMapper.delete(new LambdaQueryWrapper<PointLog>().eq(PointLog::getUserId, userId));
+        badgeUserMapper.delete(new LambdaQueryWrapper<BadgeUser>().eq(BadgeUser::getUserId, userId));
+
+        user.setNickname("已注销用户");
+        user.setUsername("deleted_" + user.getId() + "_" + System.currentTimeMillis());
+        user.setPasswordHash(encoder.encode(UUID.randomUUID().toString()));
+        user.setStatus(0);
+        user.setUpdatedAt(now);
+        userMapper.updateById(user);
+    }
+
+    private User requireUser(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new AppException("User not found");
+        }
+        return user;
     }
 
     private List<Phase2Dtos.UserSimple> toUsers(List<Long> ids) {

@@ -6,6 +6,7 @@ import com.zhihu.platform.security.UserContext;
 import com.zhihu.platform.service.AnalyticsService;
 import com.zhihu.platform.service.ProfileService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -40,6 +41,18 @@ public class ProfileController {
     @PutMapping("/me/nickname")
     public ApiResponse<Phase2Dtos.UserSimple> updateNickname(@Valid @RequestBody Phase2Dtos.UpdateNicknameRequest request) {
         return ApiResponse.ok(profileService.updateNickname(UserContext.getUserId(), request.getNickname()));
+    }
+
+    @PutMapping("/me/password")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody Phase2Dtos.ResetPasswordRequest request) {
+        profileService.resetPassword(UserContext.getUserId(), request.getNewPassword());
+        return ApiResponse.ok();
+    }
+
+    @DeleteMapping("/me")
+    public ApiResponse<Void> deleteMyAccount() {
+        profileService.deactivateAccount(UserContext.getUserId());
+        return ApiResponse.ok();
     }
 
     @GetMapping("/{userId}/space")

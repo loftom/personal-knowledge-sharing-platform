@@ -5,14 +5,15 @@
         <div class="section-tag">个人中心</div>
         <h1>我的工作台</h1>
         <p>
-          本页面用于集中展示用户的创作内容、数据报告、粉丝关系、成长体系与个人主页信息，
-          便于形成从内容生产到数据反馈的完整个人使用闭环。
+          此页面用于集中展示用户的创作内容、数据报告、粉丝关系、成长体系、个人主页与账号管理能力，
+          便于形成从内容生产到账号维护的完整个人使用闭环。
         </p>
       </div>
       <div class="hero-meta">
         <div class="meta-card">
           <span>当前用户</span>
           <strong>{{ displayName }}</strong>
+          <small>{{ username || '未登录' }}</small>
           <el-button text class="rename-btn" @click="openRename">修改昵称</el-button>
         </div>
       </div>
@@ -33,6 +34,9 @@
       </el-tab-pane>
       <el-tab-pane label="个人主页" name="profile">
         <Profile />
+      </el-tab-pane>
+      <el-tab-pane label="账号管理" name="account">
+        <AccountManage />
       </el-tab-pane>
     </el-tabs>
 
@@ -55,6 +59,7 @@ import ReportPage from './ReportPage.vue';
 import Followers from './Followers.vue';
 import GrowthCenter from './GrowthCenter.vue';
 import Profile from './Profile.vue';
+import AccountManage from './AccountManage.vue';
 
 const activeTab = ref('content');
 const nickname = ref(localStorage.getItem('nickname') || '');
@@ -171,6 +176,12 @@ onBeforeUnmount(() => {
   display: block;
   margin-top: 8px;
   font-size: 24px;
+}
+
+.meta-card small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .rename-btn {

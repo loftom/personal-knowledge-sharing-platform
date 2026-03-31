@@ -6,6 +6,7 @@ import com.zhihu.platform.domain.mapper.SensitiveWordMapper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -22,26 +23,31 @@ public class AuditService {
     @PostConstruct
     public void ensureDefaultSensitiveWords() {
         List<String> defaults = Arrays.asList(
-                "色情",
-                "色情网",
-                "成人视频",
-                "约炮",
-                "嫖娼",
-                "赌博",
-                "博彩",
-                "赌场",
-                "诈骗",
-                "刷单",
-                "兼职刷单",
-                "毒品",
-                "冰毒",
-                "大麻",
-                "枪支",
-                "炸药",
-                "代考",
-                "代写论文",
-                "出售身份证",
-                "出售银行卡",
+                "\u8272\u60c5",
+                "\u6210\u4eba\u7f51\u7ad9",
+                "\u6210\u4eba\u89c6\u9891",
+                "\u7ea6\u70ae",
+                "\u5ad6\u5a3c",
+                "\u8d4c\u535a",
+                "\u535a\u5f69",
+                "\u8d4c\u573a",
+                "\u8bc8\u9a97",
+                "\u5237\u5355",
+                "\u517c\u804c\u5237\u5355",
+                "\u6bd2\u54c1",
+                "\u51b0\u6bd2",
+                "\u5927\u9ebb",
+                "\u67aa\u652f",
+                "\u70b8\u836f",
+                "\u4ee3\u8003",
+                "\u4ee3\u5199\u8bba\u6587",
+                "\u51fa\u552e\u8eab\u4efd\u8bc1",
+                "\u51fa\u552e\u94f6\u884c\u5361",
+                "\u94f6\u884c\u5361\u51fa\u552e",
+                "\u4e70\u5356\u94f6\u884c\u5361",
+                "\u6536\u94f6\u884c\u5361",
+                "\u51fa\u552e\u5bf9\u516c\u8d26\u6237",
+                "\u56db\u4ef6\u5957",
                 "porn",
                 "gambling",
                 "casino",
@@ -70,7 +76,11 @@ public class AuditService {
                 .eq(SensitiveWord::getEnabled, 1));
         String normalizedText = normalize(text);
         for (SensitiveWord word : words) {
-            if (word.getWord() != null && normalizedText.contains(normalize(word.getWord()))) {
+            if (word.getWord() == null || word.getWord().isBlank()) {
+                continue;
+            }
+            String normalizedWord = normalize(word.getWord());
+            if (!normalizedWord.isEmpty() && normalizedText.contains(normalizedWord)) {
                 return word.getWord();
             }
         }
@@ -78,9 +88,11 @@ public class AuditService {
     }
 
     private String normalize(String text) {
-        return text == null
-                ? ""
-                : text.toLowerCase(Locale.ROOT)
-                .replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}]+", "");
+        if (text == null) {
+            return "";
+        }
+        return Normalizer.normalize(text, Normalizer.Form.NFKC)
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}\\p{S}]+", "");
     }
 }
