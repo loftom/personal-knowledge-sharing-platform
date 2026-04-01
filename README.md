@@ -43,9 +43,37 @@ npm run dev
 docker compose up -d
 ```
 
+## 演示数据初始化
+
+默认启动后端与前端时，系统只会初始化表结构、分类、标签与敏感词等基础数据。
+README 中列出的演示账号、文章、评论与推荐测试数据不会自动写入本地 H2 数据库，
+需要在项目根目录额外执行以下脚本：
+
+```powershell
+.\scripts\setup_demo_environment.ps1
+```
+
+上面的脚本会创建基础演示账号，并生成首批演示文章、评论、点赞与收藏数据。
+
+如果还需要登录页中的推荐测试账号与补充文章，请继续执行：
+
+```powershell
+.\scripts\seed_recommendation_data.ps1
+```
+
+如果 PowerShell 提示脚本执行被禁用，可仅对当前进程临时放行后再运行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\setup_demo_environment.ps1
+.\scripts\seed_recommendation_data.ps1
+```
+
 ## 演示账号
 
 ### 基础演示账号
+
+执行 `scripts/setup_demo_environment.ps1` 后可用：
 
 - 管理员：`admin_master / Admin@123456`
 - 作者账号：`author_lin / User@123456`
@@ -55,6 +83,8 @@ docker compose up -d
 - 普通用户：`reader_he / User@123456`
 
 ### 推荐功能测试账号
+
+执行 `scripts/seed_recommendation_data.ps1` 后可用：
 
 - 新增作者：`author_chen / User@123456`
 - 新增作者：`author_luo / User@123456`
