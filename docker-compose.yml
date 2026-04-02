@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   mysql:
     image: mysql:8.0
@@ -10,11 +9,50 @@ services:
     ports:
       - "3306:3306"
     command: ["--default-authentication-plugin=mysql_native_password"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     volumes:
-      - ./backend/sql:/docker-entrypoint-initdb.d
+      - mysql-data:/var/lib/mysql
+      - ./backend/sql:/docker-entrypoint-initdb.d:ro
 
   redis:
     image: redis:7.2
     container_name: personal-knowledge-platform-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: personal-knowledge-platform-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: personal-knowledge-platform-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql-data:

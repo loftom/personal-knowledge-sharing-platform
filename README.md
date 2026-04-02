@@ -8,7 +8,7 @@
 - `frontend`：Vue 3 前端应用
 - `scripts`：演示数据初始化与维护脚本
 - `docs`：答辩说明与发布文档
-- `docker-compose.yml`：本地数据库与缓存依赖示例
+- `docker-compose.yml`：前后端与数据库缓存的一体化 Docker 编排
 
 ## 当前核心能力
 
@@ -22,14 +22,43 @@
 
 ## 启动方式
 
-### 后端
+### Docker 一键启动
+
+```powershell
+.\scripts\start_docker_stack.ps1
+```
+
+上面的脚本会直接执行：
+
+```powershell
+docker compose up --build -d
+```
+
+执行前请先确认 Docker Desktop 已启动，并且界面中显示 `Engine running`。
+
+启动完成后可访问：
+
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8080`
+
+常用辅助命令：
+
+```powershell
+docker compose ps
+docker compose logs -f
+docker compose down
+```
+
+### 本地开发启动
+
+#### 后端
 
 ```powershell
 cd backend
 mvn spring-boot:run
 ```
 
-### 前端
+#### 前端
 
 ```powershell
 cd frontend
@@ -37,10 +66,10 @@ npm install
 npm run dev
 ```
 
-### Docker 依赖
+#### 仅启动数据库与缓存依赖
 
 ```powershell
-docker compose up -d
+docker compose up -d mysql redis
 ```
 
 ## 演示数据初始化
@@ -103,3 +132,6 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 当前仓库已经统一采用“个人知识分享与交流平台”的对外命名。
 为了保证系统稳定，后端 Java 包路径仍保留原有命名空间，暂未进行整仓级包名重构。
+
+当前 `scripts/setup_demo_environment.ps1` 与 `scripts/seed_recommendation_data.ps1` 默认面向本地 H2 开发模式。
+如果你使用 Docker 一键启动，后端会改为连接 Docker 中的 MySQL 与 Redis，因此现有演示数据脚本不会自动写入 Docker 的 MySQL 数据库。
