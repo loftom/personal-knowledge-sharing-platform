@@ -8,7 +8,6 @@ import Recommend from './views/Recommend.vue';
 import Profile from './views/Profile.vue';
 import Followers from './views/Followers.vue';
 import Notifications from './views/Notifications.vue';
-import DevTools from './views/DevTools.vue';
 import ContentDetail from './views/ContentDetail.vue';
 import ReportPage from './views/ReportPage.vue';
 import MyContent from './views/MyContent.vue';
@@ -31,8 +30,7 @@ const router = createRouter({
     { path: '/followers', component: Followers },
     { path: '/notifications', component: Notifications },
     { path: '/me', component: MePage },
-    { path: '/admin', component: AdminPage },
-    { path: '/dev', component: DevTools }
+    { path: '/admin', component: AdminPage }
   ]
 });
 

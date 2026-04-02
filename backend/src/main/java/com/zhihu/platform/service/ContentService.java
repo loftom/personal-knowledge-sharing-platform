@@ -35,9 +35,7 @@ public class ContentService {
     private final AuditLogMapper auditLogMapper;
     private final AuditService auditService;
     private final QaService qaService;
-    private final NotificationService notificationService;
     private final BehaviorService behaviorService;
-    private final PointService pointService;
     private final InteractionService interactionService;
 
     public ContentService(ContentMapper contentMapper,
@@ -48,9 +46,7 @@ public class ContentService {
                           AuditLogMapper auditLogMapper,
                           AuditService auditService,
                           QaService qaService,
-                          NotificationService notificationService,
                           BehaviorService behaviorService,
-                          PointService pointService,
                           InteractionService interactionService) {
         this.contentMapper = contentMapper;
         this.contentTagMapper = contentTagMapper;
@@ -60,9 +56,7 @@ public class ContentService {
         this.auditLogMapper = auditLogMapper;
         this.auditService = auditService;
         this.qaService = qaService;
-        this.notificationService = notificationService;
         this.behaviorService = behaviorService;
-        this.pointService = pointService;
         this.interactionService = interactionService;
     }
 
@@ -168,10 +162,6 @@ public class ContentService {
         }
         contentMapper.deleteById(id);
         contentTagMapper.delete(new LambdaQueryWrapper<ContentTag>().eq(ContentTag::getContentId, id));
-    }
-
-    public Content detail(Long id) {
-        return detail(id, true);
     }
 
     public Content detail(Long id, boolean increaseView) {
