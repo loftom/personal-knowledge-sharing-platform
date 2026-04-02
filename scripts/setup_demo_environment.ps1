@@ -171,43 +171,43 @@ $xuHeaders = Login-User -Username 'reader_xu' -Password 'User@123456'
 $heHeaders = Login-User -Username 'reader_he' -Password 'User@123456'
 
 $article1 = Create-Article -Headers $linHeaders `
-    -Title 'Building a complete review, notification and points loop in a Spring Boot knowledge community' `
-    -Summary 'This article explains how content review, author notification and incentive points can be connected into a stable product loop.' `
+    -Title '在知识社区中构建审核、通知与积分联动闭环的实践' `
+    -Summary '本文围绕内容审核、作者通知与积分激励三条链路，说明知识社区如何形成稳定可持续的产品闭环。' `
     -Body @"
-<p>A knowledge community becomes credible only when publishing, moderation and feedback are connected as one consistent process.</p>
-<p>In this implementation, a post first enters the review queue, then receives an audit result from the administrator, and finally triggers notification and points updates for the author.</p>
-<h2>Why this loop matters</h2>
-<p>Without review, content quality becomes unstable. Without notification, authors do not understand the platform response. Without points, the community lacks a durable incentive mechanism.</p>
-<h2>Key implementation decisions</h2>
-<p>We unified content statuses, stored audit logs for every moderation action, and added idempotent business keys for point rewards so repeated approvals would not create repeated rewards.</p>
-<p>This structure gives authors a clear publishing path, gives administrators traceable operations, and gives the platform a reliable way to encourage valuable content creation.</p>
+<p>一个知识社区要想建立可信度，前提是发布、审核与反馈能够形成统一且连贯的处理流程。</p>
+<p>在这套实现中，文章先进入待审核队列，再由管理员给出审核结果，最后触发作者通知与积分变更，形成完整业务闭环。</p>
+<h2>为什么这个闭环重要</h2>
+<p>没有审核，内容质量就容易失控；没有通知，作者无法理解平台反馈；没有积分激励，社区也很难形成长期稳定的创作动力。</p>
+<h2>实现中的关键决策</h2>
+<p>我统一了内容状态流转，记录每一次审核动作的日志，同时为积分奖励增加幂等业务键，避免重复审核导致重复发分。</p>
+<p>这样一来，作者拥有清晰的发布路径，管理员拥有可追溯的操作记录，平台也拥有鼓励优质创作的可靠机制。</p>
 "@ `
     -CategoryId 1 -TagIds @(1, 5)
 
 $article2 = Create-Article -Headers $qinHeaders `
-    -Title 'Redesigning the homepage feed of a knowledge community for long-form reading and continuous interaction' `
-    -Summary 'This article discusses homepage information hierarchy, filter layout and content card design for a healthier reading experience.' `
+    -Title '知识社区首页信息流重构：面向深度阅读与持续互动的设计思路' `
+    -Summary '本文围绕首页信息层级、筛选布局与内容卡片结构，讨论如何打造更适合知识社区的阅读体验。' `
     -Body @"
-<p>The homepage of a knowledge platform should not be only a list of records. It is the first layer of content discovery and therefore shapes how users browse, evaluate and return.</p>
-<p>During this redesign, I focused on the hero section, filter placement, and the relationship between headline, summary and metadata in every content card.</p>
-<h2>What the homepage must solve first</h2>
-<p>Users need to quickly understand what kind of content the platform contains and how they can narrow the feed by category, tag and ranking rules.</p>
-<h2>Why reading rhythm matters</h2>
-<p>If author, time and metrics compete with the headline, the eye loses focus. A stronger title area with lighter metadata improves scanning efficiency and makes the feed feel calmer.</p>
-<p>A good homepage is therefore not only a display layer. It is an interaction layer that continuously encourages reading, commenting and publishing.</p>
+<p>知识平台的首页不应该只是内容记录的堆叠，它本质上是用户发现内容的第一入口，直接影响浏览、判断与回访意愿。</p>
+<p>这次改版中，我重点关注了首屏视觉区、筛选入口的摆放方式，以及每张内容卡片中标题、摘要与元信息之间的关系。</p>
+<h2>首页首先要解决什么问题</h2>
+<p>用户需要在极短时间内理解平台主要有哪些内容，并能够通过分类、标签和排序规则快速缩小浏览范围。</p>
+<h2>为什么阅读节奏很重要</h2>
+<p>如果作者、发布时间和互动数据与标题抢占同等视觉权重，用户视线就会被打散。强化标题区、弱化次要元信息，能显著提升扫读效率。</p>
+<p>因此，一个好的首页不只是展示层，更是持续引导用户阅读、评论与发布的互动入口。</p>
 "@ `
     -CategoryId 2 -TagIds @(2)
 
 $article3 = Create-Article -Headers $songHeaders `
-    -Title 'How to organize a graduation project demo for a knowledge community platform from core flow to highlight modules' `
-    -Summary 'This article explains how to present phase one, phase two and phase three capabilities in a clean and persuasive defense flow.' `
+    -Title '知识社区毕业设计演示如何组织：从核心流程到亮点模块的展示方法' `
+    -Summary '本文说明如何将一期、二期和三期能力整理成清晰有说服力的答辩演示流程。' `
     -Body @"
-<p>For a graduation project, implementation quality alone is not enough. The system also needs a presentation structure that allows teachers to understand the complete product loop quickly.</p>
-<p>I split the platform into three phases. The first phase focuses on publishing, moderation, search and interaction. The second phase extends to recommendation, personal space and notifications. The third phase highlights analytics, growth and governance.</p>
-<h2>What should be emphasized in the defense</h2>
-<p>The most persuasive point is the complete loop: users publish content, administrators review it, approved content becomes visible, interactions are recorded, and the accumulated data feeds growth and reporting modules.</p>
-<h2>Recommended demo order</h2>
-<p>Start with a normal user creating content, switch to the administrator for moderation, then return to the front-end to show the approved result, community comments and the author growth impact.</p>
+<p>对于毕业设计来说，只有实现功能还不够，系统还需要一套能够让老师迅速理解完整产品闭环的展示结构。</p>
+<p>我将平台划分为三个阶段：第一阶段聚焦发布、审核、搜索与互动；第二阶段扩展到推荐、个人空间与通知；第三阶段突出分析、增长与治理能力。</p>
+<h2>答辩中应该重点强调什么</h2>
+<p>最有说服力的点是完整业务闭环：用户发布内容，管理员审核，审核通过后内容对外可见，互动数据被持续记录，并进一步沉淀为增长与统计分析能力。</p>
+<h2>推荐的演示顺序</h2>
+<p>建议先展示普通用户发文，再切换管理员完成审核，最后回到前端页面展示审核结果、社区评论以及作者成长数据带来的变化。</p>
 "@ `
     -CategoryId 1 -TagIds @(1, 3, 5)
 
@@ -220,15 +220,15 @@ foreach ($articleId in @($article1, $article2, $article3)) {
     Invoke-JsonGet -Url "$baseUrl/content/$articleId" -Headers $heHeaders | Out-Null
 }
 
-$commentA1 = Add-Comment -Headers $xuHeaders -ContentId $article1 -Body 'This post explains the moderation, notification and incentive loop very clearly. The audit log point is especially useful for a defense presentation.'
-$commentA2 = Add-Comment -Headers $heHeaders -ContentId $article1 -Body 'I strongly agree with the idempotency decision. Without a unique business key, repeated approval can easily create repeated point rewards.'
-Add-Comment -Headers $linHeaders -ContentId $article1 -Body 'That was exactly the reason for introducing a business key into the point log. It makes repeated reward bugs much easier to prevent.' -ParentId $commentA2 | Out-Null
+$commentA1 = Add-Comment -Headers $xuHeaders -ContentId $article1 -Body '这篇文章把审核、通知和激励闭环解释得很清楚，尤其是审核日志这一点很适合在答辩时展示。'
+$commentA2 = Add-Comment -Headers $heHeaders -ContentId $article1 -Body '我很认同这里的幂等设计，没有唯一业务键的话，重复审核确实很容易造成重复积分。'
+Add-Comment -Headers $linHeaders -ContentId $article1 -Body '这正是我在积分日志里引入业务键的原因，能大幅降低重复发奖励这类问题。' -ParentId $commentA2 | Out-Null
 
-$commentB1 = Add-Comment -Headers $linHeaders -ContentId $article2 -Body 'If the homepage structure is weak, later work on recommendation and search will also feel weak. This article makes that relationship very clear.'
-Add-Comment -Headers $xuHeaders -ContentId $article2 -Body 'The decision to prioritize headline and summary while weakening metadata makes the feed much easier to scan.' -ParentId $commentB1 | Out-Null
+$commentB1 = Add-Comment -Headers $linHeaders -ContentId $article2 -Body '如果首页结构做得不清晰，后面的推荐和搜索模块也很难体现价值，这篇文章把这种关系讲得很明白。'
+Add-Comment -Headers $xuHeaders -ContentId $article2 -Body '把标题和摘要放在更高优先级、弱化元信息之后，信息流确实更容易快速浏览。' -ParentId $commentB1 | Out-Null
 
-$commentC1 = Add-Comment -Headers $heHeaders -ContentId $article3 -Body 'Splitting the platform into three phases is a very effective way to explain the scope and highlight modules during a graduation defense.'
-Add-Comment -Headers $songHeaders -ContentId $article3 -Body 'Yes, and it also gives the demo a more natural sequence from publishing to moderation and then to growth analysis.' -ParentId $commentC1 | Out-Null
+$commentC1 = Add-Comment -Headers $heHeaders -ContentId $article3 -Body '把平台拆成三个阶段来讲，非常适合在毕业答辩里说明范围边界和模块亮点。'
+Add-Comment -Headers $songHeaders -ContentId $article3 -Body '是的，而且这样也能让演示顺序从发布、审核自然过渡到互动与增长分析。' -ParentId $commentC1 | Out-Null
 
 Toggle-Like -Headers $xuHeaders -TargetId $article1 -TargetType 'CONTENT'
 Toggle-Like -Headers $heHeaders -TargetId $article1 -TargetType 'CONTENT'
@@ -256,9 +256,9 @@ $summary = [pscustomobject]@{
         @{ role = 'USER'; username = 'reader_he'; password = 'User@123456'; nickname = 'He Qingjia' }
     )
     articles = @(
-        @{ id = $article1; title = 'Building a complete review, notification and points loop in a Spring Boot knowledge community' },
-        @{ id = $article2; title = 'Redesigning the homepage feed of a knowledge community for long-form reading and continuous interaction' },
-        @{ id = $article3; title = 'How to organize a graduation project demo for a knowledge community platform from core flow to highlight modules' }
+        @{ id = $article1; title = '在知识社区中构建审核、通知与积分联动闭环的实践' },
+        @{ id = $article2; title = '知识社区首页信息流重构：面向深度阅读与持续互动的设计思路' },
+        @{ id = $article3; title = '知识社区毕业设计演示如何组织：从核心流程到亮点模块的展示方法' }
     )
 }
 
