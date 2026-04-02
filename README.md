@@ -152,9 +152,5 @@ Set-ExecutionPolicy -Scope Process Bypass
 - Windows PowerShell 如遇执行策略限制，优先使用：`powershell -ExecutionPolicy Bypass -File .\scripts\脚本名.ps1`
 
 ## 说明
-
-当前仓库已经统一采用“个人知识分享与交流平台”的对外命名。
-为了保证系统稳定，后端 Java 包路径仍保留原有命名空间，暂未进行整仓级包名重构。
-
 当前 `scripts/setup_demo_environment.ps1` 与 `scripts/seed_recommendation_data.ps1` 默认面向本地 H2 开发模式。
 如果你使用 Docker 一键启动，后端会改为连接 Docker 中的 MySQL 与 Redis，因此现有演示数据脚本不会自动写入 Docker 的 MySQL 数据库。

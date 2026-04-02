@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>com.personalknowledge</groupId>
-    <artifactId>personal-knowledge-sharing-platform-backend</artifactId>
+    <artifactId>knowledge-platform-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>personal-knowledge-sharing-platform-backend</name>
+    <name>knowledge-platform-backend</name>
     <description>Design and Implementation of a Personal Knowledge Sharing and Communication Platform</description>
 
     <properties>

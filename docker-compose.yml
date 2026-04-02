@@ -1,7 +1,9 @@
+name: knowledge-platform
+
 services:
   mysql:
     image: mysql:8.0
-    container_name: personal-knowledge-platform-mysql
+    container_name: knowledge-platform-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: knowledge_platform
@@ -20,7 +22,7 @@ services:
 
   redis:
     image: redis:7.2
-    container_name: personal-knowledge-platform-redis
+    container_name: knowledge-platform-redis
     ports:
       - "6379:6379"
     healthcheck:
@@ -32,7 +34,7 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: personal-knowledge-platform-backend
+    container_name: knowledge-platform-backend
     depends_on:
       mysql:
         condition: service_healthy
@@ -48,7 +50,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: personal-knowledge-platform-frontend
+    container_name: knowledge-platform-frontend
     depends_on:
       - backend
     ports:
