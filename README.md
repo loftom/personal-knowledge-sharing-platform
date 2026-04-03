@@ -22,31 +22,16 @@
 
 ## 启动方式
 
-### Docker 一键启动
+PowerShell 如遇脚本执行限制，统一使用：
 
-如果 PowerShell 提示脚本执行被禁用，建议直接使用下面这种方式运行仓库中的 `.ps1` 脚本：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\脚本名.ps1
+```
+
+### Docker 一键启动
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start_docker_stack.ps1
-```
-
-或者先仅对当前终端临时放行：
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\start_docker_stack.ps1
-```
-
-正常情况下也可以直接执行：
-
-```powershell
-.\scripts\start_docker_stack.ps1
-```
-
-上面的脚本会直接执行：
-
-```powershell
-docker compose up --build -d
 ```
 
 执行前请先确认 Docker Desktop 已启动，并且界面中显示 `Engine running`。
@@ -66,9 +51,13 @@ docker compose down
 
 ### 本地开发启动
 
+本地开发默认也连接 `localhost` 上的 MySQL 和 Redis，与 Docker 后端保持同一套数据源。
+建议先启动依赖服务，再启动本地后端。
+
 #### 后端
 
 ```powershell
+docker compose up -d mysql redis
 cd backend
 mvn spring-boot:run
 ```
@@ -90,35 +79,19 @@ docker compose up -d mysql redis
 ## 演示数据初始化
 
 默认启动后端与前端时，系统只会初始化表结构、分类、标签与敏感词等基础数据。
-README 中列出的演示账号、文章、评论与推荐测试数据不会自动写入本地 H2 数据库，
+README 中列出的演示账号、文章、评论与推荐测试数据不会自动写入数据库，
 需要在项目根目录额外执行以下脚本：
-
-```powershell
-.\scripts\setup_demo_environment.ps1
-```
-
-上面的脚本会创建基础演示账号，并生成首批演示文章、评论、点赞与收藏数据。
-
-如果还需要登录页中的推荐测试账号与补充文章，请继续执行：
-
-```powershell
-.\scripts\seed_recommendation_data.ps1
-```
-
-如果 PowerShell 提示脚本执行被禁用，推荐直接使用：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_demo_environment.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\seed_recommendation_data.ps1
 ```
 
-也可以仅对当前进程临时放行后再运行：
+说明：
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\setup_demo_environment.ps1
-.\scripts\seed_recommendation_data.ps1
-```
+- `setup_demo_environment.ps1`：创建基础演示账号和首批文章、评论、点赞、收藏数据
+- `seed_recommendation_data.ps1`：补充推荐测试账号与文章数据
+- 默认写入 MySQL：容器 `knowledge-platform-mysql`，数据库 `knowledge_platform`
 
 ## 演示账号
 
@@ -149,8 +122,24 @@ Set-ExecutionPolicy -Scope Process Bypass
 - 重置基础演示环境：`scripts/setup_demo_environment.ps1`
 - 替换为中文演示数据：`scripts/replace_demo_data_cn.sql`
 - 补充推荐测试数据：`scripts/seed_recommendation_data.ps1`
-- Windows PowerShell 如遇执行策略限制，优先使用：`powershell -ExecutionPolicy Bypass -File .\scripts\脚本名.ps1`
 
 ## 说明
-当前 `scripts/setup_demo_environment.ps1` 与 `scripts/seed_recommendation_data.ps1` 默认面向本地 H2 开发模式。
-如果你使用 Docker 一键启动，后端会改为连接 Docker 中的 MySQL 与 Redis，因此现有演示数据脚本不会自动写入 Docker 的 MySQL 数据库。
+当前 `scripts/setup_demo_environment.ps1` 会直接调用 `scripts/setup_demo_environment_mysql.ps1`，默认重置并写入 Docker 中的 MySQL 数据库。
+如果你修改了容器名、数据库名或接口地址，可以通过参数覆盖，例如：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_demo_environment.ps1 -MySqlContainer your-mysql-container -MySqlDatabase your_db -BaseUrl http://localhost:8080/api
+```
+
+当前默认配置关系：
+
+- 本地 `mvn spring-boot:run`：连接 `localhost:3306` 的 MySQL 和 `localhost:6379` 的 Redis
+- Docker 后端：连接容器网络中的 `mysql` 和 `redis`
+- 两者访问的是同一套 Docker 启动出来的数据库与缓存，只是主机名不同
+
+如需临时切回旧的 H2 单机模式：
+
+```powershell
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=h2
+```

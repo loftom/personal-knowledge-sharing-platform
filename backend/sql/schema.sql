@@ -155,3 +155,32 @@ CREATE TABLE IF NOT EXISTS notification (
     read_at DATETIME NULL,
     INDEX idx_notification_user(user_id, is_read)
 );
+
+CREATE TABLE IF NOT EXISTS point_account (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    balance BIGINT NOT NULL DEFAULT 0,
+    level_no INT NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_point_account_user(user_id)
+);
+
+CREATE TABLE IF NOT EXISTS point_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    change_amount INT NOT NULL,
+    reason VARCHAR(64) NOT NULL,
+    biz_key VARCHAR(128) NOT NULL,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uk_point_log_biz(biz_key),
+    INDEX idx_point_log_user(user_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS badge_user (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    badge_code VARCHAR(64) NOT NULL,
+    badge_name VARCHAR(128) NOT NULL,
+    awarded_at DATETIME NOT NULL,
+    UNIQUE KEY uk_badge_user(user_id, badge_code)
+);

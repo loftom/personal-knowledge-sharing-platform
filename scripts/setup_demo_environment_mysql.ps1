@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$BaseUrl = 'http://localhost:8080/api',
     [string]$MySqlContainer = 'knowledge-platform-mysql',
     [string]$MySqlDatabase = 'knowledge_platform',
@@ -6,21 +6,20 @@ param(
     [string]$MySqlPassword = 'root'
 )
 
-& (Join-Path $PSScriptRoot 'setup_demo_environment_mysql.ps1') `
-    -BaseUrl $BaseUrl `
-    -MySqlContainer $MySqlContainer `
-    -MySqlDatabase $MySqlDatabase `
-    -MySqlUser $MySqlUser `
-    -MySqlPassword $MySqlPassword
-return
-
 $ErrorActionPreference = 'Stop'
 
-$root = Split-Path -Parent $PSScriptRoot
-$h2Jar = Join-Path $env:USERPROFILE '.m2\repository\com\h2database\h2\2.2.224\h2-2.2.224.jar'
-$dbUrl = 'jdbc:h2:file:./data/knowledge_platform;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE;NON_KEYWORDS=USER'
-$sqlScript = Join-Path $PSScriptRoot 'reset_demo_data.sql'
-$baseUrl = 'http://localhost:8080/api'
+$mySqlResetScript = Join-Path $PSScriptRoot 'reset_demo_data_mysql.sql'
+$mySqlSchemaScript = Join-Path (Split-Path $PSScriptRoot -Parent) 'backend\sql\schema.sql'
+
+function Assert-Success {
+    param(
+        [int]$ExitCode,
+        [string]$Action
+    )
+    if ($ExitCode -ne 0) {
+        throw "$Action failed with exit code $ExitCode"
+    }
+}
 
 function Invoke-JsonPost {
     param(
@@ -46,24 +45,28 @@ function Invoke-JsonGet {
     Invoke-RestMethod -Method Get -Uri $Url -Headers $Headers
 }
 
-function Run-H2Script {
-    param([string]$ScriptPath)
-    Push-Location (Join-Path $root 'backend')
-    try {
-        & java -cp $h2Jar org.h2.tools.RunScript -url $dbUrl -user sa -script $ScriptPath | Out-Null
-    } finally {
-        Pop-Location
-    }
+function Invoke-MySqlCommand {
+    param(
+        [string[]]$Arguments = @(),
+        [string]$InputText = ''
+    )
+    $docker = Get-Command docker -ErrorAction Stop
+    $InputText | & $docker.Source exec -i $MySqlContainer mysql "--user=$MySqlUser" "--password=$MySqlPassword" --default-character-set=utf8mb4 $MySqlDatabase @Arguments
+    Assert-Success -ExitCode $LASTEXITCODE -Action 'Run MySQL command'
 }
 
-function Run-H2Sql {
-    param([string]$Sql)
-    Push-Location (Join-Path $root 'backend')
-    try {
-        & java -cp $h2Jar org.h2.tools.Shell -url $dbUrl -user sa -sql $Sql | Out-Null
-    } finally {
-        Pop-Location
+function Run-MySqlScript {
+    param([string]$ScriptPath)
+    if (-not (Test-Path -LiteralPath $ScriptPath)) {
+        throw "MySQL script not found: $ScriptPath"
     }
+    $content = Get-Content -LiteralPath $ScriptPath -Raw -Encoding UTF8
+    Invoke-MySqlCommand -InputText $content
+}
+
+function Run-MySqlSql {
+    param([string]$Sql)
+    Invoke-MySqlCommand -Arguments @('-e', $Sql)
 }
 
 function Register-User {
@@ -72,7 +75,7 @@ function Register-User {
         [string]$Password,
         [string]$Nickname
     )
-    Invoke-JsonPost -Url "$baseUrl/auth/register" -Body @{
+    Invoke-JsonPost -Url "$BaseUrl/auth/register" -Body @{
         username = $Username
         password = $Password
         nickname = $Nickname
@@ -84,11 +87,20 @@ function Login-User {
         [string]$Username,
         [string]$Password
     )
-    $response = Invoke-JsonPost -Url "$baseUrl/auth/login" -Body @{
+    $response = Invoke-JsonPost -Url "$BaseUrl/auth/login" -Body @{
         username = $Username
         password = $Password
     }
     @{ Authorization = "Bearer $($response.data.token)" }
+}
+
+function Get-TagMap {
+    $response = Invoke-JsonGet -Url "$BaseUrl/public/taxonomy/tags"
+    $map = @{}
+    foreach ($item in $response.data) {
+        $map[$item.name] = [int]$item.id
+    }
+    $map
 }
 
 function Create-Article {
@@ -98,16 +110,25 @@ function Create-Article {
         [string]$Summary,
         [string]$Body,
         [int]$CategoryId,
-        [int[]]$TagIds
+        [string[]]$TagNames,
+        [hashtable]$TagMap
     )
-    $response = Invoke-JsonPost -Url "$baseUrl/content" -Headers $Headers -Body @{
+    $tagIds = @()
+    foreach ($tagName in $TagNames) {
+        if (-not $TagMap.ContainsKey($tagName)) {
+            throw "Tag not found: $tagName"
+        }
+        $tagIds += $TagMap[$tagName]
+    }
+
+    $response = Invoke-JsonPost -Url "$BaseUrl/content" -Headers $Headers -Body @{
         type = 'ARTICLE'
         title = $Title
         summary = $Summary
         body = $Body
         categoryId = $CategoryId
         visibility = 'PUBLIC'
-        tagIds = $TagIds
+        tagIds = $tagIds
     }
     [int64]$response.data
 }
@@ -117,7 +138,7 @@ function Approve-Article {
         [hashtable]$Headers,
         [int64]$ContentId
     )
-    Invoke-JsonPost -Url "$baseUrl/admin/audit/$ContentId/approve" -Headers $Headers -Body @{} | Out-Null
+    Invoke-JsonPost -Url "$BaseUrl/admin/audit/$ContentId/approve" -Headers $Headers -Body @{} | Out-Null
 }
 
 function Add-Comment {
@@ -131,7 +152,7 @@ function Add-Comment {
     if ($null -ne $ParentId) {
         $payload.parentId = $ParentId
     }
-    $response = Invoke-JsonPost -Url "$baseUrl/interaction/comment/$ContentId" -Headers $Headers -Body $payload
+    $response = Invoke-JsonPost -Url "$BaseUrl/interaction/comment/$ContentId" -Headers $Headers -Body $payload
     [int64]$response.data
 }
 
@@ -141,7 +162,7 @@ function Toggle-Like {
         [int64]$TargetId,
         [string]$TargetType
     )
-    Invoke-JsonPost -Url "$baseUrl/interaction/like/toggle" -Headers $Headers -Body @{
+    Invoke-JsonPost -Url "$BaseUrl/interaction/like/toggle" -Headers $Headers -Body @{
         targetId = $TargetId
         targetType = $TargetType
     } | Out-Null
@@ -152,10 +173,44 @@ function Toggle-Favorite {
         [hashtable]$Headers,
         [int64]$ContentId
     )
-    Invoke-JsonPost -Url "$baseUrl/interaction/favorite/$ContentId/toggle" -Headers $Headers -Body @{} | Out-Null
+    Invoke-JsonPost -Url "$BaseUrl/interaction/favorite/$ContentId/toggle" -Headers $Headers -Body @{} | Out-Null
 }
 
-Run-H2Script -ScriptPath $sqlScript
+Run-MySqlScript -ScriptPath $mySqlSchemaScript
+Run-MySqlScript -ScriptPath $mySqlResetScript
+
+Run-MySqlSql -Sql @"
+INSERT INTO category(id, parent_id, name, sort, enabled) VALUES
+(1, 0, '后端开发', 1, 1),
+(2, 0, '前端开发', 2, 1),
+(3, 0, '算法与数据结构', 3, 1);
+
+INSERT INTO tag(id, name) VALUES
+(1, 'SpringBoot'),
+(2, 'Vue3'),
+(3, 'MySQL'),
+(4, 'Redis'),
+(5, 'Java');
+
+INSERT INTO sensitive_word(id, word, enabled) VALUES
+(1, '色情', 1),
+(2, '赌博', 1),
+(3, '诈骗', 1),
+(4, '刷单', 1),
+(5, '毒品', 1),
+(6, '枪支', 1),
+(7, '炸药', 1),
+(8, '代考', 1),
+(9, '代写论文', 1),
+(10, '出售银行卡', 1),
+(11, 'porn', 1),
+(12, 'gambling', 1),
+(13, 'casino', 1),
+(14, 'scam', 1),
+(15, 'drug', 1),
+(16, 'gun', 1),
+(17, 'explosive', 1);
+"@
 
 $users = @(
     @{ username = 'admin_master'; password = 'Admin@123456'; nickname = 'System Admin' },
@@ -170,7 +225,7 @@ foreach ($user in $users) {
     Register-User -Username $user.username -Password $user.password -Nickname $user.nickname
 }
 
-Run-H2Sql -Sql @"
+Run-MySqlSql -Sql @"
 UPDATE user SET role = 'ADMIN', nickname = 'System Admin' WHERE username = 'admin_master';
 UPDATE user SET nickname = 'Lin Zhiyuan' WHERE username = 'author_lin';
 UPDATE user SET nickname = 'Qin Ruoxi' WHERE username = 'author_qin';
@@ -186,6 +241,8 @@ $songHeaders = Login-User -Username 'author_song' -Password 'User@123456'
 $xuHeaders = Login-User -Username 'reader_xu' -Password 'User@123456'
 $heHeaders = Login-User -Username 'reader_he' -Password 'User@123456'
 
+$tagMap = Get-TagMap
+
 $article1 = Create-Article -Headers $linHeaders `
     -Title '在知识社区中构建审核、通知与积分联动闭环的实践' `
     -Summary '本文围绕内容审核、作者通知与积分激励三条链路，说明知识社区如何形成稳定可持续的产品闭环。' `
@@ -198,7 +255,7 @@ $article1 = Create-Article -Headers $linHeaders `
 <p>我统一了内容状态流转，记录每一次审核动作的日志，同时为积分奖励增加幂等业务键，避免重复审核导致重复发分。</p>
 <p>这样一来，作者拥有清晰的发布路径，管理员拥有可追溯的操作记录，平台也拥有鼓励优质创作的可靠机制。</p>
 "@ `
-    -CategoryId 1 -TagIds @(1, 5)
+    -CategoryId 1 -TagNames @('SpringBoot', 'Java') -TagMap $tagMap
 
 $article2 = Create-Article -Headers $qinHeaders `
     -Title '知识社区首页信息流重构：面向深度阅读与持续互动的设计思路' `
@@ -212,28 +269,28 @@ $article2 = Create-Article -Headers $qinHeaders `
 <p>如果作者、发布时间和互动数据与标题抢占同等视觉权重，用户视线就会被打散。强化标题区、弱化次要元信息，能显著提升扫读效率。</p>
 <p>因此，一个好的首页不只是展示层，更是持续引导用户阅读、评论与发布的互动入口。</p>
 "@ `
-    -CategoryId 2 -TagIds @(2)
+    -CategoryId 2 -TagNames @('Vue3') -TagMap $tagMap
 
 $article3 = Create-Article -Headers $songHeaders `
     -Title '知识社区毕业设计演示如何组织：从核心流程到亮点模块的展示方法' `
     -Summary '本文说明如何将一期、二期和三期能力整理成清晰有说服力的答辩演示流程。' `
     -Body @"
-<p>对于毕业设计来说，只有实现功能还不够，系统还需要一套能够让老师迅速理解完整产品闭环的展示结构。</p>
+<p>对于毕业设计来说，只有实现功能还不够，系统还需要一套能够让老师快速理解完整产品闭环的展示结构。</p>
 <p>我将平台划分为三个阶段：第一阶段聚焦发布、审核、搜索与互动；第二阶段扩展到推荐、个人空间与通知；第三阶段突出分析、增长与治理能力。</p>
 <h2>答辩中应该重点强调什么</h2>
 <p>最有说服力的点是完整业务闭环：用户发布内容，管理员审核，审核通过后内容对外可见，互动数据被持续记录，并进一步沉淀为增长与统计分析能力。</p>
 <h2>推荐的演示顺序</h2>
 <p>建议先展示普通用户发文，再切换管理员完成审核，最后回到前端页面展示审核结果、社区评论以及作者成长数据带来的变化。</p>
 "@ `
-    -CategoryId 1 -TagIds @(1, 3, 5)
+    -CategoryId 1 -TagNames @('SpringBoot', 'MySQL', 'Java') -TagMap $tagMap
 
 foreach ($articleId in @($article1, $article2, $article3)) {
     Approve-Article -Headers $adminHeaders -ContentId $articleId
 }
 
 foreach ($articleId in @($article1, $article2, $article3)) {
-    Invoke-JsonGet -Url "$baseUrl/content/$articleId" -Headers $xuHeaders | Out-Null
-    Invoke-JsonGet -Url "$baseUrl/content/$articleId" -Headers $heHeaders | Out-Null
+    Invoke-JsonGet -Url "$BaseUrl/content/$articleId" -Headers $xuHeaders | Out-Null
+    Invoke-JsonGet -Url "$BaseUrl/content/$articleId" -Headers $heHeaders | Out-Null
 }
 
 $commentA1 = Add-Comment -Headers $xuHeaders -ContentId $article1 -Body '这篇文章把审核、通知和激励闭环解释得很清楚，尤其是审核日志这一点很适合在答辩时展示。'
