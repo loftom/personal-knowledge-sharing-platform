@@ -56,10 +56,19 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '../api';
+
+type ShortcutAccount = {
+  label: string;
+  nickname: string;
+  username: string;
+  password: string;
+};
+
+const CUSTOM_SHORTCUTS_KEY = 'customLoginShortcuts';
 
 const router = useRouter();
 const submitting = ref(false);
@@ -68,7 +77,7 @@ const activeTab = ref('login');
 const loginForm = reactive({ username: '', password: '' });
 const registerForm = reactive({ username: '', nickname: '', password: '' });
 
-const accounts = [
+const presetAccounts: ShortcutAccount[] = [
   { label: '管理员', nickname: '系统管理员', username: 'admin_master', password: 'Admin@123456' },
   { label: '作者账号', nickname: '林知远', username: 'author_lin', password: 'User@123456' },
   { label: '作者账号', nickname: '秦若溪', username: 'author_qin', password: 'User@123456' },
@@ -82,6 +91,45 @@ const accounts = [
   { label: '新增读者', nickname: '周沐禾', username: 'reader_zhou', password: 'User@123456' },
   { label: '新增读者', nickname: '吴知夏', username: 'reader_wu', password: 'User@123456' }
 ];
+
+const customAccounts = ref<ShortcutAccount[]>(loadCustomAccounts());
+const accounts = computed(() => [...customAccounts.value, ...presetAccounts]);
+
+function loadCustomAccounts(): ShortcutAccount[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SHORTCUTS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.username === 'string' && typeof item.password === 'string')
+      .map((item) => ({
+        label: typeof item.label === 'string' && item.label.trim() ? item.label : '新注册用户',
+        nickname: typeof item.nickname === 'string' ? item.nickname : item.username,
+        username: item.username,
+        password: item.password
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function persistCustomAccounts() {
+  localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(customAccounts.value));
+}
+
+function upsertShortcutAccount(account: ShortcutAccount) {
+  const next = [
+    account,
+    ...customAccounts.value.filter((item) => item.username !== account.username && !presetAccounts.some((preset) => preset.username === item.username))
+  ];
+  customAccounts.value = next.slice(0, 8);
+  persistCustomAccounts();
+}
 
 function fillAccount(account: { username: string; password: string }) {
   activeTab.value = 'login';
@@ -117,6 +165,12 @@ async function register() {
   submitting.value = true;
   try {
     await api.post('/auth/register', registerForm);
+    upsertShortcutAccount({
+      label: '新注册用户',
+      nickname: registerForm.nickname.trim(),
+      username: registerForm.username.trim(),
+      password: registerForm.password
+    });
     ElMessage.success('注册成功，请直接登录');
     loginForm.username = registerForm.username;
     loginForm.password = registerForm.password;
