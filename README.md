@@ -34,6 +34,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\脚本名.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\start_docker_stack.ps1
 ```
 
+如需在启动前重新构建前后端镜像：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_docker_stack.ps1 -Build
+```
+
 执行前请先确认 Docker Desktop 已启动，并且界面中显示 `Engine running`。
 
 启动完成后可访问：
@@ -48,6 +54,13 @@ docker compose ps
 docker compose logs -f
 docker compose down
 ```
+
+说明：
+
+- 默认执行 `docker compose up -d`，适合日常启动
+- 只有传入 `-Build` 时才执行 `docker compose up --build -d`
+- 当前端、后端代码、Dockerfile 或 Maven 打包配置发生变化时，建议使用 `-Build`
+- 首次拉取最新代码后如果前端打不开，优先先执行一次 `-Build`
 
 ### 本地开发启动
 

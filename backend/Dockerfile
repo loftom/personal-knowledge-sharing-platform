@@ -12,7 +12,7 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=builder /app/target/knowledge-platform-backend-0.0.1-SNAPSHOT.jar ./app.jar
+COPY --from=builder /app/target/knowledge-platform-backend-0.0.1-SNAPSHOT-exec.jar ./app.jar
 
 RUN mkdir -p /app/uploads
 
