@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '../api';
@@ -92,8 +92,13 @@ const presetAccounts: ShortcutAccount[] = [
   { label: '新增读者', nickname: '吴知夏', username: 'reader_wu', password: 'User@123456' }
 ];
 
-const customAccounts = ref<ShortcutAccount[]>(loadCustomAccounts());
-const accounts = computed(() => [...customAccounts.value, ...presetAccounts]);
+const customAccounts = ref<ShortcutAccount[]>([]);
+const accounts = computed(() => {
+  const customMap = new Map(customAccounts.value.map((item) => [item.username, item]));
+  const mergedPreset = presetAccounts.map((item) => ({ ...item, ...(customMap.get(item.username) || {}) }));
+  const extraCustom = customAccounts.value.filter((item) => !presetAccounts.some((preset) => preset.username === item.username));
+  return [...extraCustom, ...mergedPreset];
+});
 
 function loadCustomAccounts(): ShortcutAccount[] {
   try {
@@ -122,10 +127,14 @@ function persistCustomAccounts() {
   localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(customAccounts.value));
 }
 
+function refreshCustomAccounts() {
+  customAccounts.value = loadCustomAccounts();
+}
+
 function upsertShortcutAccount(account: ShortcutAccount) {
   const next = [
     account,
-    ...customAccounts.value.filter((item) => item.username !== account.username && !presetAccounts.some((preset) => preset.username === item.username))
+    ...customAccounts.value.filter((item) => item.username !== account.username)
   ];
   customAccounts.value = next.slice(0, 8);
   persistCustomAccounts();
@@ -142,12 +151,24 @@ async function login(account?: { username: string; password: string }) {
   submitting.value = true;
   try {
     const res = await api.post('/auth/login', payload);
+    const nextUsername = res.data.data.username || payload.username;
+    const nextNickname = res.data.data.nickname || nextUsername;
     localStorage.setItem('token', res.data.data.token);
     localStorage.setItem('userId', String(res.data.data.userId));
-    localStorage.setItem('nickname', res.data.data.nickname || '');
-    localStorage.setItem('username', res.data.data.username || payload.username);
+    localStorage.setItem('nickname', nextNickname);
+    localStorage.setItem('username', nextUsername);
     localStorage.setItem('role', res.data.data.role || 'USER');
+    upsertShortcutAccount({
+      label:
+        customAccounts.value.find((item) => item.username === nextUsername)?.label ||
+        presetAccounts.find((item) => item.username === nextUsername)?.label ||
+        '新注册用户',
+      nickname: nextNickname,
+      username: nextUsername,
+      password: payload.password
+    });
     window.dispatchEvent(new Event('auth-change'));
+    window.dispatchEvent(new Event('login-shortcuts-change'));
     ElMessage.success('登录成功');
     router.push(res.data.data.role === 'ADMIN' ? '/admin' : '/');
   } catch (e: any) {
@@ -184,6 +205,17 @@ async function register() {
     submitting.value = false;
   }
 }
+
+onMounted(() => {
+  refreshCustomAccounts();
+  window.addEventListener('login-shortcuts-change', refreshCustomAccounts);
+  window.addEventListener('storage', refreshCustomAccounts);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('login-shortcuts-change', refreshCustomAccounts);
+  window.removeEventListener('storage', refreshCustomAccounts);
+});
 </script>
 
 <style scoped>

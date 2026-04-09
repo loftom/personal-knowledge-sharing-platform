@@ -7,11 +7,13 @@ import com.knowledge.platform.domain.dto.ContentDtos;
 import com.knowledge.platform.domain.entity.Comment;
 import com.knowledge.platform.domain.entity.Content;
 import com.knowledge.platform.domain.entity.FavoriteRecord;
+import com.knowledge.platform.domain.entity.FollowRelation;
 import com.knowledge.platform.domain.entity.LikeRecord;
 import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.CommentMapper;
 import com.knowledge.platform.domain.mapper.ContentMapper;
 import com.knowledge.platform.domain.mapper.FavoriteRecordMapper;
+import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.LikeRecordMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
 import com.knowledge.platform.security.UserContext;
@@ -32,6 +34,7 @@ public class InteractionService {
     private final FavoriteRecordMapper favoriteRecordMapper;
     private final CommentMapper commentMapper;
     private final ContentMapper contentMapper;
+    private final FollowRelationMapper followRelationMapper;
     private final UserMapper userMapper;
     private final BehaviorService behaviorService;
     private final NotificationService notificationService;
@@ -41,6 +44,7 @@ public class InteractionService {
                               FavoriteRecordMapper favoriteRecordMapper,
                               CommentMapper commentMapper,
                               ContentMapper contentMapper,
+                              FollowRelationMapper followRelationMapper,
                               UserMapper userMapper,
                               BehaviorService behaviorService,
                               NotificationService notificationService,
@@ -49,6 +53,7 @@ public class InteractionService {
         this.favoriteRecordMapper = favoriteRecordMapper;
         this.commentMapper = commentMapper;
         this.contentMapper = contentMapper;
+        this.followRelationMapper = followRelationMapper;
         this.userMapper = userMapper;
         this.behaviorService = behaviorService;
         this.notificationService = notificationService;
@@ -58,6 +63,12 @@ public class InteractionService {
     @Transactional
     public boolean toggleLike(ContentDtos.ToggleRequest request) {
         Long userId = UserContext.getUserId();
+        if ("CONTENT".equalsIgnoreCase(request.getTargetType())) {
+            Content content = contentMapper.selectById(request.getTargetId());
+            if (!canInteractWithContent(content, userId)) {
+                throw new AppException("Content is not visible");
+            }
+        }
         LikeRecord exists = likeRecordMapper.selectOne(new LambdaQueryWrapper<LikeRecord>()
                 .eq(LikeRecord::getUserId, userId)
                 .eq(LikeRecord::getTargetId, request.getTargetId())
@@ -103,6 +114,10 @@ public class InteractionService {
     @Transactional
     public boolean toggleFavorite(Long contentId) {
         Long userId = UserContext.getUserId();
+        Content content = contentMapper.selectById(contentId);
+        if (!canInteractWithContent(content, userId)) {
+            throw new AppException("Content is not visible");
+        }
         FavoriteRecord exists = favoriteRecordMapper.selectOne(new LambdaQueryWrapper<FavoriteRecord>()
                 .eq(FavoriteRecord::getUserId, userId)
                 .eq(FavoriteRecord::getContentId, contentId));
@@ -129,7 +144,7 @@ public class InteractionService {
 
     public Long comment(Long contentId, ContentDtos.CommentRequest request) {
         Content content = contentMapper.selectById(contentId);
-        if (content == null || !"PUBLISHED".equals(content.getStatus())) {
+        if (!canInteractWithContent(content, UserContext.getUserId())) {
             throw new AppException("Content is not commentable");
         }
         Comment comment = new Comment();
@@ -214,5 +229,31 @@ public class InteractionService {
             }
         }
         return "用户 " + userId;
+    }
+
+    private boolean canInteractWithContent(Content content, Long viewerUserId) {
+        if (content == null || !"PUBLISHED".equals(content.getStatus())) {
+            return false;
+        }
+        String visibility = content.getVisibility();
+        if (visibility == null || visibility.isBlank() || "PUBLIC".equalsIgnoreCase(visibility)) {
+            return true;
+        }
+        if (viewerUserId == null) {
+            return false;
+        }
+        if (viewerUserId.equals(content.getAuthorId())) {
+            return true;
+        }
+        if ("PRIVATE".equalsIgnoreCase(visibility)) {
+            return false;
+        }
+        if ("FOLLOWERS".equalsIgnoreCase(visibility)) {
+            return followRelationMapper.selectCount(new LambdaQueryWrapper<FollowRelation>()
+                    .eq(FollowRelation::getFollowerUserId, viewerUserId)
+                    .eq(FollowRelation::getTargetUserId, content.getAuthorId())
+                    .eq(FollowRelation::getStatus, 1)) > 0;
+        }
+        return false;
     }
 }

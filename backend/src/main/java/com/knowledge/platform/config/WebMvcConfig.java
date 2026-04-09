@@ -18,10 +18,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // For local development allow auth and uploads public, keep content protected
         registry.addInterceptor(authInterceptor)
             .addPathPatterns("/api/**")
-            .excludePathPatterns("/api/auth/**", "/api/uploads");
+            .excludePathPatterns("/api/auth/**");
     }
 
     @Override

@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.domain.entity.Content;
 import com.knowledge.platform.domain.entity.ContentTag;
+import com.knowledge.platform.domain.entity.FollowRelation;
 import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.ContentMapper;
 import com.knowledge.platform.domain.mapper.ContentTagMapper;
+import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
 import com.knowledge.platform.security.UserContext;
 import org.springframework.stereotype.Service;
@@ -21,15 +23,18 @@ public class RecommendService {
 
     private final ContentMapper contentMapper;
     private final ContentTagMapper contentTagMapper;
+    private final FollowRelationMapper followRelationMapper;
     private final UserMapper userMapper;
     private final BehaviorService behaviorService;
 
     public RecommendService(ContentMapper contentMapper,
                             ContentTagMapper contentTagMapper,
+                            FollowRelationMapper followRelationMapper,
                             UserMapper userMapper,
                             BehaviorService behaviorService) {
         this.contentMapper = contentMapper;
         this.contentTagMapper = contentTagMapper;
+        this.followRelationMapper = followRelationMapper;
         this.userMapper = userMapper;
         this.behaviorService = behaviorService;
     }
@@ -40,7 +45,10 @@ public class RecommendService {
         List<Content> candidates = contentMapper.selectList(new LambdaQueryWrapper<Content>()
                 .eq(Content::getStatus, "PUBLISHED")
                 .orderByDesc(Content::getPublishedAt)
-                .last("LIMIT 300"));
+                .last("LIMIT 300"))
+                .stream()
+                .filter(content -> canRecommend(content, userId))
+                .toList();
 
         List<Phase2Dtos.RecommendItem> ranked = new ArrayList<>();
         for (Content c : candidates) {
@@ -110,5 +118,31 @@ public class RecommendService {
             return username.trim();
         }
         return "用户 " + authorId;
+    }
+
+    private boolean canRecommend(Content content, Long viewerUserId) {
+        if (content == null) {
+            return false;
+        }
+        String visibility = content.getVisibility();
+        if (visibility == null || visibility.isBlank() || "PUBLIC".equalsIgnoreCase(visibility)) {
+            return true;
+        }
+        if (viewerUserId == null) {
+            return false;
+        }
+        if (viewerUserId.equals(content.getAuthorId())) {
+            return true;
+        }
+        if ("PRIVATE".equalsIgnoreCase(visibility)) {
+            return false;
+        }
+        if ("FOLLOWERS".equalsIgnoreCase(visibility)) {
+            return followRelationMapper.selectCount(new LambdaQueryWrapper<FollowRelation>()
+                    .eq(FollowRelation::getFollowerUserId, viewerUserId)
+                    .eq(FollowRelation::getTargetUserId, content.getAuthorId())
+                    .eq(FollowRelation::getStatus, 1)) > 0;
+        }
+        return false;
     }
 }

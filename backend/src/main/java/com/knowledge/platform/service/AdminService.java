@@ -125,6 +125,9 @@ public class AdminService {
         if (content == null) {
             throw new AppException("Content not found");
         }
+        if (!"PENDING_REVIEW".equals(content.getStatus())) {
+            throw new AppException("Only pending content can be approved");
+        }
         content.setStatus("PUBLISHED");
         if (content.getPublishedAt() == null) {
             content.setPublishedAt(LocalDateTime.now());

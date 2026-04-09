@@ -8,11 +8,13 @@ import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.domain.entity.AuditLog;
 import com.knowledge.platform.domain.entity.Content;
 import com.knowledge.platform.domain.entity.ContentTag;
+import com.knowledge.platform.domain.entity.FollowRelation;
 import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.AuditLogMapper;
 import com.knowledge.platform.domain.mapper.CategoryMapper;
 import com.knowledge.platform.domain.mapper.ContentMapper;
 import com.knowledge.platform.domain.mapper.ContentTagMapper;
+import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.TagMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
 import com.knowledge.platform.security.UserContext;
@@ -32,6 +34,7 @@ public class ContentService {
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
     private final UserMapper userMapper;
+    private final FollowRelationMapper followRelationMapper;
     private final AuditLogMapper auditLogMapper;
     private final AuditService auditService;
     private final QaService qaService;
@@ -43,6 +46,7 @@ public class ContentService {
                           CategoryMapper categoryMapper,
                           TagMapper tagMapper,
                           UserMapper userMapper,
+                          FollowRelationMapper followRelationMapper,
                           AuditLogMapper auditLogMapper,
                           AuditService auditService,
                           QaService qaService,
@@ -53,6 +57,7 @@ public class ContentService {
         this.categoryMapper = categoryMapper;
         this.tagMapper = tagMapper;
         this.userMapper = userMapper;
+        this.followRelationMapper = followRelationMapper;
         this.auditLogMapper = auditLogMapper;
         this.auditService = auditService;
         this.qaService = qaService;
@@ -169,8 +174,8 @@ public class ContentService {
         if (content == null) {
             throw new AppException("Content not found");
         }
-        if (!"PUBLISHED".equals(content.getStatus()) && !UserContext.isAdmin()
-                && !content.getAuthorId().equals(UserContext.getUserId())) {
+        Long currentUserId = UserContext.getUserId();
+        if (!canViewContent(content, currentUserId)) {
             throw new AppException("Content is not visible");
         }
 
@@ -181,7 +186,6 @@ public class ContentService {
             content.setViewCount(content.getViewCount() + 1);
         }
         content.setAuthorName(resolveAuthorName(content.getAuthorId()));
-        Long currentUserId = UserContext.getUserId();
         content.setLiked(interactionService.hasLikedContent(id, currentUserId));
         content.setFavorited(interactionService.hasFavoritedContent(id, currentUserId));
         behaviorService.record(currentUserId, "VIEW", "CONTENT", id, 1);
@@ -212,7 +216,10 @@ public class ContentService {
             wrapper.orderByDesc(Content::getPublishedAt);
         }
 
-        List<Content> all = contentMapper.selectList(wrapper);
+        List<Content> all = contentMapper.selectList(wrapper)
+                .stream()
+                .filter(content -> canViewContent(content, UserContext.getUserId()))
+                .toList();
         if (tagId != null) {
             List<Long> taggedIds = contentTagMapper.selectList(new LambdaQueryWrapper<ContentTag>()
                             .eq(ContentTag::getTagId, tagId))
@@ -336,5 +343,38 @@ public class ContentService {
             return username.trim();
         }
         return "用户 " + authorId;
+    }
+
+    private boolean canViewContent(Content content, Long viewerUserId) {
+        if (content == null) {
+            return false;
+        }
+        if (UserContext.isAdmin()) {
+            return true;
+        }
+        if (!"PUBLISHED".equals(content.getStatus())) {
+            return viewerUserId != null && viewerUserId.equals(content.getAuthorId());
+        }
+
+        String visibility = content.getVisibility();
+        if (visibility == null || visibility.isBlank() || "PUBLIC".equalsIgnoreCase(visibility)) {
+            return true;
+        }
+        if (viewerUserId == null) {
+            return false;
+        }
+        if (viewerUserId.equals(content.getAuthorId())) {
+            return true;
+        }
+        if ("PRIVATE".equalsIgnoreCase(visibility)) {
+            return false;
+        }
+        if ("FOLLOWERS".equalsIgnoreCase(visibility)) {
+            return followRelationMapper.selectCount(new LambdaQueryWrapper<FollowRelation>()
+                    .eq(FollowRelation::getFollowerUserId, viewerUserId)
+                    .eq(FollowRelation::getTargetUserId, content.getAuthorId())
+                    .eq(FollowRelation::getStatus, 1)) > 0;
+        }
+        return false;
     }
 }

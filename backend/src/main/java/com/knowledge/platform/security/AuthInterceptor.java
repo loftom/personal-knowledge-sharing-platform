@@ -1,5 +1,7 @@
 package com.knowledge.platform.security;
 
+import com.knowledge.platform.domain.entity.User;
+import com.knowledge.platform.domain.mapper.UserMapper;
 import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -13,6 +15,7 @@ import java.util.List;
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
+    private final UserMapper userMapper;
     private static final AntPathMatcher MATCHER = new AntPathMatcher();
 
     private static final List<String> PUBLIC_PATHS = List.of(
@@ -22,8 +25,9 @@ public class AuthInterceptor implements HandlerInterceptor {
             "/error"
     );
 
-    public AuthInterceptor(JwtUtil jwtUtil) {
+    public AuthInterceptor(JwtUtil jwtUtil, UserMapper userMapper) {
         this.jwtUtil = jwtUtil;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -61,6 +65,11 @@ public class AuthInterceptor implements HandlerInterceptor {
                 }
                 Long userId = uidObj instanceof Number ? ((Number) uidObj).longValue() : Long.parseLong(String.valueOf(uidObj));
                 String role = roleObj == null ? "USER" : String.valueOf(roleObj);
+                User user = userMapper.selectById(userId);
+                if (user == null || user.getStatus() == null || user.getStatus() == 0) {
+                    response.setStatus(401);
+                    return false;
+                }
                 UserContext.set(userId, role);
                 return true;
             } catch (Exception e) {

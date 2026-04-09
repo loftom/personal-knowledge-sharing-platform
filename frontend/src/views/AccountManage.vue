@@ -48,6 +48,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '../api';
 
+const CUSTOM_SHORTCUTS_KEY = 'customLoginShortcuts';
 const router = useRouter();
 const username = computed(() => localStorage.getItem('username') || '当前账号');
 const newPassword = ref('');
@@ -56,6 +57,24 @@ const resetting = ref(false);
 const deleteVisible = ref(false);
 const deleteConfirmText = ref('');
 const deleting = ref(false);
+
+function removeShortcutAccount(targetUsername: string) {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SHORTCUTS_KEY);
+    if (!raw) {
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+    const next = parsed.filter((item) => item && item.username !== targetUsername);
+    localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event('login-shortcuts-change'));
+  } catch {
+    // Ignore malformed cached shortcut data and keep account deletion successful.
+  }
+}
 
 function clearAuthState() {
   localStorage.removeItem('token');
@@ -101,7 +120,9 @@ async function deleteAccount() {
 
   deleting.value = true;
   try {
+    const deletingUsername = username.value;
     await api.delete('/profile/me');
+    removeShortcutAccount(deletingUsername);
     clearAuthState();
     deleteVisible.value = false;
     ElMessage.success('账号已删除，已退出登录');

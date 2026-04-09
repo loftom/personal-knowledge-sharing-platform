@@ -158,12 +158,12 @@ function Toggle-Favorite {
 Run-H2Script -ScriptPath $sqlScript
 
 $users = @(
-    @{ username = 'admin_master'; password = 'Admin@123456'; nickname = 'System Admin' },
-    @{ username = 'author_lin'; password = 'User@123456'; nickname = 'Lin Zhiyuan' },
-    @{ username = 'author_qin'; password = 'User@123456'; nickname = 'Qin Ruoxi' },
-    @{ username = 'author_song'; password = 'User@123456'; nickname = 'Song Mingzhe' },
-    @{ username = 'reader_xu'; password = 'User@123456'; nickname = 'Xu Wensheng' },
-    @{ username = 'reader_he'; password = 'User@123456'; nickname = 'He Qingjia' }
+    @{ username = 'admin_master'; password = 'Admin@123456'; nickname = '系统管理员' },
+    @{ username = 'author_lin'; password = 'User@123456'; nickname = '林知远' },
+    @{ username = 'author_qin'; password = 'User@123456'; nickname = '秦若溪' },
+    @{ username = 'author_song'; password = 'User@123456'; nickname = '宋明哲' },
+    @{ username = 'reader_xu'; password = 'User@123456'; nickname = '徐闻笙' },
+    @{ username = 'reader_he'; password = 'User@123456'; nickname = '何清嘉' }
 )
 
 foreach ($user in $users) {
@@ -171,12 +171,12 @@ foreach ($user in $users) {
 }
 
 Run-H2Sql -Sql @"
-UPDATE user SET role = 'ADMIN', nickname = 'System Admin' WHERE username = 'admin_master';
-UPDATE user SET nickname = 'Lin Zhiyuan' WHERE username = 'author_lin';
-UPDATE user SET nickname = 'Qin Ruoxi' WHERE username = 'author_qin';
-UPDATE user SET nickname = 'Song Mingzhe' WHERE username = 'author_song';
-UPDATE user SET nickname = 'Xu Wensheng' WHERE username = 'reader_xu';
-UPDATE user SET nickname = 'He Qingjia' WHERE username = 'reader_he';
+UPDATE user SET role = 'ADMIN', nickname = '系统管理员' WHERE username = 'admin_master';
+UPDATE user SET nickname = '林知远' WHERE username = 'author_lin';
+UPDATE user SET nickname = '秦若溪' WHERE username = 'author_qin';
+UPDATE user SET nickname = '宋明哲' WHERE username = 'author_song';
+UPDATE user SET nickname = '徐闻笙' WHERE username = 'reader_xu';
+UPDATE user SET nickname = '何清嘉' WHERE username = 'reader_he';
 "@
 
 $adminHeaders = Login-User -Username 'admin_master' -Password 'Admin@123456'
@@ -264,12 +264,12 @@ Toggle-Like -Headers $songHeaders -TargetId $commentC1 -TargetType 'COMMENT'
 
 $summary = [pscustomobject]@{
     accounts = @(
-        @{ role = 'ADMIN'; username = 'admin_master'; password = 'Admin@123456'; nickname = 'System Admin' },
-        @{ role = 'USER'; username = 'author_lin'; password = 'User@123456'; nickname = 'Lin Zhiyuan' },
-        @{ role = 'USER'; username = 'author_qin'; password = 'User@123456'; nickname = 'Qin Ruoxi' },
-        @{ role = 'USER'; username = 'author_song'; password = 'User@123456'; nickname = 'Song Mingzhe' },
-        @{ role = 'USER'; username = 'reader_xu'; password = 'User@123456'; nickname = 'Xu Wensheng' },
-        @{ role = 'USER'; username = 'reader_he'; password = 'User@123456'; nickname = 'He Qingjia' }
+        @{ role = 'ADMIN'; username = 'admin_master'; password = 'Admin@123456'; nickname = '系统管理员' },
+        @{ role = 'USER'; username = 'author_lin'; password = 'User@123456'; nickname = '林知远' },
+        @{ role = 'USER'; username = 'author_qin'; password = 'User@123456'; nickname = '秦若溪' },
+        @{ role = 'USER'; username = 'author_song'; password = 'User@123456'; nickname = '宋明哲' },
+        @{ role = 'USER'; username = 'reader_xu'; password = 'User@123456'; nickname = '徐闻笙' },
+        @{ role = 'USER'; username = 'reader_he'; password = 'User@123456'; nickname = '何清嘉' }
     )
     articles = @(
         @{ id = $article1; title = '在知识社区中构建审核、通知与积分联动闭环的实践' },

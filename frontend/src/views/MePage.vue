@@ -61,6 +61,7 @@ import GrowthCenter from './GrowthCenter.vue';
 import Profile from './Profile.vue';
 import AccountManage from './AccountManage.vue';
 
+const CUSTOM_SHORTCUTS_KEY = 'customLoginShortcuts';
 const activeTab = ref('content');
 const nickname = ref(localStorage.getItem('nickname') || '');
 const username = ref(localStorage.getItem('username') || '');
@@ -86,6 +87,32 @@ function openRename() {
   renameVisible.value = true;
 }
 
+function syncShortcutNickname(nextNickname: string) {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SHORTCUTS_KEY);
+    if (!raw) {
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+
+    const currentUsername = localStorage.getItem('username') || '';
+    const next = parsed.map((item) => {
+      if (!item || item.username !== currentUsername) {
+        return item;
+      }
+      return { ...item, nickname: nextNickname };
+    });
+
+    localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event('login-shortcuts-change'));
+  } catch {
+    // Ignore malformed cached shortcut data and keep the profile update successful.
+  }
+}
+
 async function updateNickname() {
   if (!nicknameDraft.value.trim()) {
     ElMessage.warning('请输入新的昵称');
@@ -94,8 +121,10 @@ async function updateNickname() {
   renaming.value = true;
   try {
     const res = await api.put('/profile/me/nickname', { nickname: nicknameDraft.value });
-    localStorage.setItem('nickname', res.data.data.nickname || nicknameDraft.value);
+    const nextNickname = res.data.data.nickname || nicknameDraft.value.trim();
+    localStorage.setItem('nickname', nextNickname);
     localStorage.setItem('username', res.data.data.username || localStorage.getItem('username') || '');
+    syncShortcutNickname(nextNickname);
     window.dispatchEvent(new Event('auth-change'));
     syncAuthState();
     renameVisible.value = false;

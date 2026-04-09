@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.knowledge.platform.common.AppException;
 import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.domain.entity.Content;
+import com.knowledge.platform.domain.entity.FollowRelation;
 import com.knowledge.platform.domain.entity.QaAnswer;
 import com.knowledge.platform.domain.entity.QaQuestion;
 import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.ContentMapper;
+import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.QaAnswerMapper;
 import com.knowledge.platform.domain.mapper.QaQuestionMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
@@ -29,6 +31,7 @@ public class QaService {
     private final QaQuestionMapper qaQuestionMapper;
     private final QaAnswerMapper qaAnswerMapper;
     private final ContentMapper contentMapper;
+    private final FollowRelationMapper followRelationMapper;
     private final UserMapper userMapper;
     private final BehaviorService behaviorService;
     private final NotificationService notificationService;
@@ -37,6 +40,7 @@ public class QaService {
     public QaService(QaQuestionMapper qaQuestionMapper,
                      QaAnswerMapper qaAnswerMapper,
                      ContentMapper contentMapper,
+                     FollowRelationMapper followRelationMapper,
                      UserMapper userMapper,
                      BehaviorService behaviorService,
                      NotificationService notificationService,
@@ -44,6 +48,7 @@ public class QaService {
         this.qaQuestionMapper = qaQuestionMapper;
         this.qaAnswerMapper = qaAnswerMapper;
         this.contentMapper = contentMapper;
+        this.followRelationMapper = followRelationMapper;
         this.userMapper = userMapper;
         this.behaviorService = behaviorService;
         this.notificationService = notificationService;
@@ -69,7 +74,7 @@ public class QaService {
 
     @Transactional
     public Long addAnswer(Long questionId, Phase2Dtos.CreateAnswerRequest request) {
-        assertQuestion(questionId);
+        assertQuestion(questionId, UserContext.getUserId(), true);
         QaAnswer answer = new QaAnswer();
         answer.setQuestionId(questionId);
         answer.setUserId(UserContext.getUserId());
@@ -95,7 +100,7 @@ public class QaService {
 
     @Transactional
     public void pickBestAnswer(Long questionId, Long answerId) {
-        Content question = assertQuestion(questionId);
+        Content question = assertQuestion(questionId, UserContext.getUserId(), true);
         if (!question.getAuthorId().equals(UserContext.getUserId()) && !UserContext.isAdmin()) {
             throw new AppException("No permission to mark best answer");
         }
@@ -124,7 +129,7 @@ public class QaService {
     }
 
     public void reopen(Long questionId) {
-        Content question = assertQuestion(questionId);
+        Content question = assertQuestion(questionId, UserContext.getUserId(), true);
         if (!question.getAuthorId().equals(UserContext.getUserId()) && !UserContext.isAdmin()) {
             throw new AppException("No permission to reopen question");
         }
@@ -140,7 +145,7 @@ public class QaService {
     }
 
     public Phase2Dtos.QuestionStateResponse state(Long questionId) {
-        assertQuestion(questionId);
+        assertQuestion(questionId, UserContext.getUserId(), false);
         QaQuestion meta = getOrInitMeta(questionId);
         Phase2Dtos.QuestionStateResponse response = new Phase2Dtos.QuestionStateResponse();
         response.setQuestionId(questionId);
@@ -151,7 +156,7 @@ public class QaService {
     }
 
     public List<Phase2Dtos.AnswerItem> answers(Long questionId) {
-        assertQuestion(questionId);
+        assertQuestion(questionId, UserContext.getUserId(), false);
         List<QaAnswer> answers = qaAnswerMapper.selectList(new LambdaQueryWrapper<QaAnswer>()
                         .eq(QaAnswer::getQuestionId, questionId)
                         .eq(QaAnswer::getStatus, 1)
@@ -172,6 +177,10 @@ public class QaService {
             wrapper.and(w -> w.like(Content::getTitle, keyword).or().like(Content::getBody, keyword));
         }
         List<Content> questions = contentMapper.selectList(wrapper);
+        Long currentUserId = UserContext.getUserId();
+        questions = questions.stream()
+                .filter(content -> canAccessQuestion(content, currentUserId))
+                .toList();
         Map<Long, User> userMap = loadUserMap(questions.stream().map(Content::getAuthorId).toList());
         return questions.stream()
                 .map(content -> toQuestionListItem(content, userMap.get(content.getAuthorId())))
@@ -251,11 +260,47 @@ public class QaService {
         return question;
     }
 
-    private Content assertQuestion(Long questionId) {
+    private Content assertQuestion(Long questionId, Long viewerUserId, boolean allowOwnerOnUnpublished) {
         Content question = contentMapper.selectById(questionId);
         if (question == null || !"QUESTION".equalsIgnoreCase(question.getType())) {
             throw new AppException("Question not found");
         }
+        if (!canAccessQuestion(question, viewerUserId, allowOwnerOnUnpublished)) {
+            throw new AppException("Question is not visible");
+        }
         return question;
+    }
+
+    private boolean canAccessQuestion(Content question, Long viewerUserId) {
+        return canAccessQuestion(question, viewerUserId, false);
+    }
+
+    private boolean canAccessQuestion(Content question, Long viewerUserId, boolean allowOwnerOnUnpublished) {
+        if (question == null) {
+            return false;
+        }
+        if (!"PUBLISHED".equals(question.getStatus())) {
+            return allowOwnerOnUnpublished && viewerUserId != null && viewerUserId.equals(question.getAuthorId());
+        }
+        String visibility = question.getVisibility();
+        if (visibility == null || visibility.isBlank() || "PUBLIC".equalsIgnoreCase(visibility)) {
+            return true;
+        }
+        if (viewerUserId == null) {
+            return false;
+        }
+        if (viewerUserId.equals(question.getAuthorId()) || UserContext.isAdmin()) {
+            return true;
+        }
+        if ("PRIVATE".equalsIgnoreCase(visibility)) {
+            return false;
+        }
+        if ("FOLLOWERS".equalsIgnoreCase(visibility)) {
+            return followRelationMapper.selectCount(new LambdaQueryWrapper<FollowRelation>()
+                    .eq(FollowRelation::getFollowerUserId, viewerUserId)
+                    .eq(FollowRelation::getTargetUserId, question.getAuthorId())
+                    .eq(FollowRelation::getStatus, 1)) > 0;
+        }
+        return false;
     }
 }
