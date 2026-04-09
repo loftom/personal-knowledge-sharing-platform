@@ -144,7 +144,12 @@ public class AdminService {
         if (content == null) {
             throw new AppException("Content not found");
         }
+        if (!"PENDING_REVIEW".equals(content.getStatus())) {
+            throw new AppException("Only pending content can be rejected");
+        }
         content.setStatus("REJECTED");
+        content.setPublishedAt(null);
+        content.setUpdatedAt(LocalDateTime.now());
         contentMapper.updateById(content);
         saveAudit(contentId, "REJECT", reason == null ? "Audit rejected" : reason);
     }
@@ -155,7 +160,11 @@ public class AdminService {
         if (content == null) {
             throw new AppException("Content not found");
         }
+        if (!"PUBLISHED".equals(content.getStatus())) {
+            throw new AppException("Only published content can be taken offline");
+        }
         content.setStatus("OFFLINE");
+        content.setUpdatedAt(LocalDateTime.now());
         contentMapper.updateById(content);
         pointService.penalizeOffline(content.getAuthorId(), content.getId());
         saveAudit(contentId, "OFFLINE", reason == null ? "Admin offline" : reason);

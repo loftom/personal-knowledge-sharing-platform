@@ -69,6 +69,7 @@ type ShortcutAccount = {
 };
 
 const CUSTOM_SHORTCUTS_KEY = 'customLoginShortcuts';
+const REMOVED_SHORTCUTS_KEY = 'removedLoginShortcutUsernames';
 
 const router = useRouter();
 const submitting = ref(false);
@@ -93,10 +94,16 @@ const presetAccounts: ShortcutAccount[] = [
 ];
 
 const customAccounts = ref<ShortcutAccount[]>([]);
+const removedShortcutUsernames = ref<string[]>([]);
 const accounts = computed(() => {
+  const removed = new Set(removedShortcutUsernames.value);
   const customMap = new Map(customAccounts.value.map((item) => [item.username, item]));
-  const mergedPreset = presetAccounts.map((item) => ({ ...item, ...(customMap.get(item.username) || {}) }));
-  const extraCustom = customAccounts.value.filter((item) => !presetAccounts.some((preset) => preset.username === item.username));
+  const mergedPreset = presetAccounts
+    .filter((item) => !removed.has(item.username))
+    .map((item) => ({ ...item, ...(customMap.get(item.username) || {}) }));
+  const extraCustom = customAccounts.value.filter(
+    (item) => !removed.has(item.username) && !presetAccounts.some((preset) => preset.username === item.username)
+  );
   return [...extraCustom, ...mergedPreset];
 });
 
@@ -123,15 +130,49 @@ function loadCustomAccounts(): ShortcutAccount[] {
   }
 }
 
+function loadRemovedShortcutUsernames(): string[] {
+  try {
+    const raw = localStorage.getItem(REMOVED_SHORTCUTS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((item) => typeof item === 'string' && item.trim());
+  } catch {
+    return [];
+  }
+}
+
 function persistCustomAccounts() {
   localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(customAccounts.value));
 }
 
+function persistRemovedShortcutUsernames() {
+  localStorage.setItem(REMOVED_SHORTCUTS_KEY, JSON.stringify(removedShortcutUsernames.value));
+}
+
 function refreshCustomAccounts() {
   customAccounts.value = loadCustomAccounts();
+  removedShortcutUsernames.value = loadRemovedShortcutUsernames();
+}
+
+function clearRemovedShortcutUsername(username: string) {
+  if (!username.trim()) {
+    return;
+  }
+  const next = removedShortcutUsernames.value.filter((item) => item !== username);
+  if (next.length === removedShortcutUsernames.value.length) {
+    return;
+  }
+  removedShortcutUsernames.value = next;
+  persistRemovedShortcutUsernames();
 }
 
 function upsertShortcutAccount(account: ShortcutAccount) {
+  clearRemovedShortcutUsername(account.username);
   const next = [
     account,
     ...customAccounts.value.filter((item) => item.username !== account.username)

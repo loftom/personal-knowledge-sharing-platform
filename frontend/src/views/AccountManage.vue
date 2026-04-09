@@ -49,8 +49,10 @@ import { ElMessage } from 'element-plus';
 import api from '../api';
 
 const CUSTOM_SHORTCUTS_KEY = 'customLoginShortcuts';
+const REMOVED_SHORTCUTS_KEY = 'removedLoginShortcutUsernames';
 const router = useRouter();
 const username = computed(() => localStorage.getItem('username') || '当前账号');
+const nickname = computed(() => localStorage.getItem('nickname') || '');
 const newPassword = ref('');
 const confirmPassword = ref('');
 const resetting = ref(false);
@@ -61,15 +63,22 @@ const deleting = ref(false);
 function removeShortcutAccount(targetUsername: string) {
   try {
     const raw = localStorage.getItem(CUSTOM_SHORTCUTS_KEY);
-    if (!raw) {
-      return;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const currentNickname = nickname.value.trim();
+        const next = parsed.filter(
+          (item) => item && item.username !== targetUsername && (!currentNickname || item.nickname !== currentNickname)
+        );
+        localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(next));
+      }
     }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return;
-    }
-    const next = parsed.filter((item) => item && item.username !== targetUsername);
-    localStorage.setItem(CUSTOM_SHORTCUTS_KEY, JSON.stringify(next));
+
+    const removedRaw = localStorage.getItem(REMOVED_SHORTCUTS_KEY);
+    const parsedRemoved = removedRaw ? JSON.parse(removedRaw) : [];
+    const removed = Array.isArray(parsedRemoved) ? parsedRemoved : [];
+    const nextRemoved = Array.from(new Set([...removed, targetUsername])).slice(-20);
+    localStorage.setItem(REMOVED_SHORTCUTS_KEY, JSON.stringify(nextRemoved));
     window.dispatchEvent(new Event('login-shortcuts-change'));
   } catch {
     // Ignore malformed cached shortcut data and keep account deletion successful.
