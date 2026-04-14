@@ -34,6 +34,11 @@ public class AdminAuditController {
         return ApiResponse.ok(adminService.overview());
     }
 
+    @GetMapping("/dashboard")
+    public ApiResponse<Phase2Dtos.AdminDashboardResponse> dashboard() {
+        return ApiResponse.ok(adminService.dashboard());
+    }
+
     @GetMapping("/preferences")
     public ApiResponse<List<Phase2Dtos.UserPreferenceView>> preferences() {
         return ApiResponse.ok(adminService.userPreferences());

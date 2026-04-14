@@ -1,11 +1,12 @@
 import axios from 'axios';
+import { clearAdminAuth, clearUserAuth, getActiveAuth, isAdminPath } from './utils/auth';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api'
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = getActiveAuth().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -28,12 +29,13 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error?.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('nickname');
-      localStorage.removeItem('username');
-      localStorage.removeItem('role');
-      window.dispatchEvent(new Event('auth-change'));
+      if (isAdminPath()) {
+        clearAdminAuth();
+        window.dispatchEvent(new Event('admin-auth-change'));
+      } else {
+        clearUserAuth();
+        window.dispatchEvent(new Event('auth-change'));
+      }
     }
     return Promise.reject(error);
   }

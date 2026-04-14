@@ -67,6 +67,22 @@ public class Phase2Dtos {
     }
 
     @Data
+    public static class AdminDashboardResponse {
+        private Long totalUserCount;
+        private Long activeUserCount;
+        private Long deletedUserCount;
+        private Long totalContentCount;
+        private Long publishedContentCount;
+        private Long articleCount;
+        private Long questionCount;
+        private Long totalViewCount;
+        private Long totalLikeCount;
+        private Long totalFavoriteCount;
+        private Long totalCommentCount;
+        private Long totalFollowerCount;
+    }
+
+    @Data
     public static class RecommendItem {
         private Long contentId;
         private String title;

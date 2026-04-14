@@ -1,13 +1,34 @@
-﻿<template>
+<template>
   <div class="login-page">
     <div class="login-panel">
       <div class="hero">
-        <div class="hero-badge">账号入口</div>
-        <h2>登录知识社区</h2>
-        <p>
-          登录后可进入内容创作、个人工作台与后台审核流程。左侧提供当前演示环境中的快捷切换账号，
-          便于在普通用户与管理员之间快速完成测试和演示。
+        <div class="hero-badge">{{ isAdminMode ? '后台登录入口' : '账号入口' }}</div>
+        <h2>{{ isAdminMode ? '登录管理后台' : '登录知识社区' }}</h2>
+        <p v-if="isAdminMode">
+          当前页面将以独立后台会话登录管理员账号，不会覆盖前台普通用户的登录状态，适合管理员与用户双开测试。
         </p>
+        <p v-else>
+          登录后可进入内容创作、个人工作台与社区互动流程。管理员如需独立进入后台，请使用“进入后台”按钮打开后台登录。
+        </p>
+
+        <div class="hero-actions">
+          <el-button
+            v-if="!isAdminMode"
+            size="large"
+            plain
+            @click="router.push('/login?mode=admin')"
+          >
+            进入后台
+          </el-button>
+          <el-button
+            v-else
+            size="large"
+            plain
+            @click="router.push('/login')"
+          >
+            返回用户登录
+          </el-button>
+        </div>
 
         <div class="preset-list">
           <button v-for="account in accounts" :key="account.username" class="preset-card" @click="fillAccount(account)">
@@ -28,12 +49,14 @@
               <el-form-item>
                 <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" size="large" show-password />
               </el-form-item>
-              <div class="account-tip">点击左侧账号卡片后，可直接使用当前表单完成登录。</div>
+              <div class="account-tip">
+                {{ isAdminMode ? '后台登录仅接受管理员账号，登录成功后将进入独立后台会话。' : '点击左侧账号卡片后，可直接使用当前表单完成登录。' }}
+              </div>
               <el-button class="login-btn" type="primary" size="large" :loading="submitting" @click="login()">登录</el-button>
             </el-form>
           </el-tab-pane>
 
-          <el-tab-pane label="注册" name="register">
+          <el-tab-pane v-if="!isAdminMode" label="注册" name="register">
             <el-form @submit.prevent>
               <el-form-item>
                 <el-input v-model="registerForm.username" placeholder="请输入用户名" size="large" />
@@ -57,9 +80,10 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '../api';
+import { clearAdminAuth, setAdminAuth, setUserAuth } from '../utils/auth';
 
 type ShortcutAccount = {
   label: string;
@@ -72,8 +96,10 @@ const CUSTOM_SHORTCUTS_KEY = 'customLoginShortcuts';
 const REMOVED_SHORTCUTS_KEY = 'removedLoginShortcutUsernames';
 
 const router = useRouter();
+const route = useRoute();
 const submitting = ref(false);
 const activeTab = ref('login');
+const isAdminMode = computed(() => route.query.mode === 'admin');
 
 const loginForm = reactive({ username: '', password: '' });
 const registerForm = reactive({ username: '', nickname: '', password: '' });
@@ -100,9 +126,13 @@ const accounts = computed(() => {
   const customMap = new Map(customAccounts.value.map((item) => [item.username, item]));
   const mergedPreset = presetAccounts
     .filter((item) => !removed.has(item.username))
+    .filter((item) => (isAdminMode.value ? item.username === 'admin_master' : item.username !== 'admin_master'))
     .map((item) => ({ ...item, ...(customMap.get(item.username) || {}) }));
   const extraCustom = customAccounts.value.filter(
-    (item) => !removed.has(item.username) && !presetAccounts.some((preset) => preset.username === item.username)
+    (item) =>
+      !removed.has(item.username) &&
+      !presetAccounts.some((preset) => preset.username === item.username) &&
+      (!isAdminMode.value || item.label === '管理员')
   );
   return [...extraCustom, ...mergedPreset];
 });
@@ -194,11 +224,41 @@ async function login(account?: { username: string; password: string }) {
     const res = await api.post('/auth/login', payload);
     const nextUsername = res.data.data.username || payload.username;
     const nextNickname = res.data.data.nickname || nextUsername;
-    localStorage.setItem('token', res.data.data.token);
-    localStorage.setItem('userId', String(res.data.data.userId));
-    localStorage.setItem('nickname', nextNickname);
-    localStorage.setItem('username', nextUsername);
-    localStorage.setItem('role', res.data.data.role || 'USER');
+    const nextRole = res.data.data.role || 'USER';
+
+    if (isAdminMode.value) {
+      if (nextRole !== 'ADMIN') {
+        clearAdminAuth();
+        ElMessage.error('后台登录仅支持管理员账号');
+        return;
+      }
+      setAdminAuth({
+        token: res.data.data.token,
+        userId: String(res.data.data.userId),
+        nickname: nextNickname,
+        username: nextUsername,
+        role: nextRole
+      });
+      upsertShortcutAccount({
+        label: '管理员',
+        nickname: nextNickname,
+        username: nextUsername,
+        password: payload.password
+      });
+      window.dispatchEvent(new Event('admin-auth-change'));
+      window.dispatchEvent(new Event('login-shortcuts-change'));
+      ElMessage.success('后台登录成功');
+      router.push('/admin');
+      return;
+    }
+
+    setUserAuth({
+      token: res.data.data.token,
+      userId: String(res.data.data.userId),
+      nickname: nextNickname,
+      username: nextUsername,
+      role: nextRole
+    });
     upsertShortcutAccount({
       label:
         customAccounts.value.find((item) => item.username === nextUsername)?.label ||
@@ -211,7 +271,7 @@ async function login(account?: { username: string; password: string }) {
     window.dispatchEvent(new Event('auth-change'));
     window.dispatchEvent(new Event('login-shortcuts-change'));
     ElMessage.success('登录成功');
-    router.push(res.data.data.role === 'ADMIN' ? '/admin' : '/');
+    router.push('/');
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '登录失败');
   } finally {
@@ -249,6 +309,9 @@ async function register() {
 
 onMounted(() => {
   refreshCustomAccounts();
+  if (isAdminMode.value) {
+    activeTab.value = 'login';
+  }
   window.addEventListener('login-shortcuts-change', refreshCustomAccounts);
   window.addEventListener('storage', refreshCustomAccounts);
 });
@@ -300,6 +363,12 @@ onBeforeUnmount(() => {
   margin: 0;
   color: #475569;
   line-height: 1.8;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .preset-list {

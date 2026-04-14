@@ -4,11 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.knowledge.platform.common.AppException;
 import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.domain.entity.AuditLog;
+import com.knowledge.platform.domain.entity.Comment;
 import com.knowledge.platform.domain.entity.Content;
+import com.knowledge.platform.domain.entity.FollowRelation;
 import com.knowledge.platform.domain.entity.Tag;
 import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.AuditLogMapper;
+import com.knowledge.platform.domain.mapper.CommentMapper;
 import com.knowledge.platform.domain.mapper.ContentMapper;
+import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.TagMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
 import com.knowledge.platform.security.UserContext;
@@ -31,6 +35,8 @@ public class AdminService {
     private final UserMapper userMapper;
     private final BehaviorService behaviorService;
     private final TagMapper tagMapper;
+    private final CommentMapper commentMapper;
+    private final FollowRelationMapper followRelationMapper;
 
     public AdminService(ContentMapper contentMapper,
                         AuditLogMapper auditLogMapper,
@@ -38,7 +44,9 @@ public class AdminService {
                         PointService pointService,
                         UserMapper userMapper,
                         BehaviorService behaviorService,
-                        TagMapper tagMapper) {
+                        TagMapper tagMapper,
+                        CommentMapper commentMapper,
+                        FollowRelationMapper followRelationMapper) {
         this.contentMapper = contentMapper;
         this.auditLogMapper = auditLogMapper;
         this.notificationService = notificationService;
@@ -46,6 +54,8 @@ public class AdminService {
         this.userMapper = userMapper;
         this.behaviorService = behaviorService;
         this.tagMapper = tagMapper;
+        this.commentMapper = commentMapper;
+        this.followRelationMapper = followRelationMapper;
     }
 
     public List<Content> pendingList() {
@@ -80,9 +90,54 @@ public class AdminService {
         return overview;
     }
 
+    public Phase2Dtos.AdminDashboardResponse dashboard() {
+        requireAdmin();
+        List<Content> contents = contentMapper.selectList(new LambdaQueryWrapper<Content>());
+        long activeUserCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
+                .eq(User::getStatus, 1));
+        long deletedUserCount = userMapper.selectCount(new LambdaQueryWrapper<User>()
+                .eq(User::getStatus, 0));
+        long totalUserCount = activeUserCount;
+        long totalContentCount = contents.size();
+        List<Content> publishedContents = contents.stream()
+                .filter(item -> "PUBLISHED".equals(item.getStatus()))
+                .toList();
+        long publishedContentCount = publishedContents.size();
+        long articleCount = publishedContents.stream()
+                .filter(item -> "ARTICLE".equals(item.getType()))
+                .count();
+        long questionCount = publishedContents.stream()
+                .filter(item -> "QUESTION".equals(item.getType()))
+                .count();
+        long totalViewCount = publishedContents.stream().mapToLong(item -> nullSafe(item.getViewCount())).sum();
+        long totalLikeCount = publishedContents.stream().mapToLong(item -> nullSafe(item.getLikeCount())).sum();
+        long totalFavoriteCount = publishedContents.stream().mapToLong(item -> nullSafe(item.getFavoriteCount())).sum();
+        long totalCommentCount = commentMapper.selectCount(new LambdaQueryWrapper<Comment>()
+                .eq(Comment::getStatus, 1));
+        long totalFollowerCount = followRelationMapper.selectCount(new LambdaQueryWrapper<FollowRelation>()
+                .eq(FollowRelation::getStatus, 1));
+
+        Phase2Dtos.AdminDashboardResponse response = new Phase2Dtos.AdminDashboardResponse();
+        response.setTotalUserCount(totalUserCount);
+        response.setActiveUserCount(activeUserCount);
+        response.setDeletedUserCount(deletedUserCount);
+        response.setTotalContentCount(totalContentCount);
+        response.setPublishedContentCount(publishedContentCount);
+        response.setArticleCount(articleCount);
+        response.setQuestionCount(questionCount);
+        response.setTotalViewCount(totalViewCount);
+        response.setTotalLikeCount(totalLikeCount);
+        response.setTotalFavoriteCount(totalFavoriteCount);
+        response.setTotalCommentCount(totalCommentCount);
+        response.setTotalFollowerCount(totalFollowerCount);
+        return response;
+    }
+
     public List<Phase2Dtos.UserPreferenceView> userPreferences() {
         requireAdmin();
-        List<User> users = userMapper.selectList(new LambdaQueryWrapper<User>().orderByAsc(User::getId));
+        List<User> users = userMapper.selectList(new LambdaQueryWrapper<User>()
+                .eq(User::getStatus, 1)
+                .orderByAsc(User::getId));
         List<Tag> tags = tagMapper.selectList(new LambdaQueryWrapper<Tag>().orderByAsc(Tag::getId));
         Map<Long, String> tagNameMap = tags.stream().collect(Collectors.toMap(Tag::getId, Tag::getName));
 
@@ -189,6 +244,10 @@ public class AdminService {
     private long countByStatus(String status) {
         return contentMapper.selectCount(new LambdaQueryWrapper<Content>()
                 .eq(Content::getStatus, status));
+    }
+
+    private long nullSafe(Long value) {
+        return value == null ? 0L : value;
     }
 
     private String resolveAuthorName(Long authorId) {

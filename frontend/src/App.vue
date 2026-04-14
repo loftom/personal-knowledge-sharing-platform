@@ -1,10 +1,13 @@
 <template>
-  <el-container class="app-shell">
+  <template v-if="isAdminLayout">
+    <router-view />
+  </template>
+  <el-container v-else class="app-shell">
     <el-header class="app-header">
       <div class="brand" @click="$router.push('/')">
-        <span class="brand-mark">知</span>
+        <span class="brand-mark"></span>
         <div>
-          <div class="brand-title">知识社区平台</div>
+          <div class="brand-title">个人知识分享与交流平台</div>
           <div class="brand-subtitle">Graduation Project Demo</div>
         </div>
       </div>
@@ -19,9 +22,8 @@
 
       <div class="nav-actions">
         <el-button plain @click="$router.push('/notifications')">通知</el-button>
-        <el-button v-if="isAdmin" plain type="primary" @click="$router.push('/admin')">后台管理</el-button>
         <template v-if="isLoggedIn">
-          <span class="welcome-text">你好，{{ displayName }}</span>
+          <span class="welcome-text">欢迎，{{ displayName }}</span>
           <el-button plain @click="switchAccount">切换账号</el-button>
           <el-button plain @click="logout">退出登录</el-button>
         </template>
@@ -37,40 +39,57 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import api from './api';
+import { clearUserAuth, getUserAuth, setUserAuth } from './utils/auth';
 
 const router = useRouter();
-const token = ref(localStorage.getItem('token') || '');
-const nickname = ref(localStorage.getItem('nickname') || '');
-const username = ref(localStorage.getItem('username') || '');
-const role = ref(localStorage.getItem('role') || '');
+const route = useRoute();
+const token = ref(getUserAuth().token);
+const nickname = ref(getUserAuth().nickname);
+const username = ref(getUserAuth().username);
 
 const isLoggedIn = computed(() => !!token.value);
-const isAdmin = computed(() => role.value === 'ADMIN');
-const displayName = computed(() => sanitizeDisplayName(nickname.value, username.value));
-
-function sanitizeDisplayName(rawNickname: string, rawUsername: string) {
-  const nicknameValue = (rawNickname || '').trim();
+const isAdminLayout = computed(() => route.path.startsWith('/admin'));
+const displayName = computed(() => {
+  const nicknameValue = (nickname.value || '').trim();
   if (nicknameValue && !/^[?]+$/.test(nicknameValue)) {
     return nicknameValue;
   }
-  return (rawUsername || '').trim() || '用户';
-}
+  return (username.value || '').trim() || '用户';
+});
 
-function syncAuthState() {
-  token.value = localStorage.getItem('token') || '';
-  nickname.value = localStorage.getItem('nickname') || '';
-  username.value = localStorage.getItem('username') || '';
-  role.value = localStorage.getItem('role') || '';
+async function syncAuthState() {
+  const auth = getUserAuth();
+  token.value = auth.token;
+  nickname.value = auth.nickname;
+  username.value = auth.username;
+
+  if (!token.value) {
+    return;
+  }
+
+  try {
+    const res = await api.get('/profile/me/space');
+    const user = res.data.data?.user;
+    if (user?.nickname || user?.username) {
+      setUserAuth({
+        ...auth,
+        nickname: user?.nickname || auth.nickname,
+        username: user?.username || auth.username
+      });
+      token.value = auth.token;
+      nickname.value = user?.nickname || auth.nickname;
+      username.value = user?.username || auth.username;
+    }
+  } catch {
+    // Ignore profile refresh errors and keep cached auth state.
+  }
 }
 
 function clearAuth() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('userId');
-  localStorage.removeItem('nickname');
-  localStorage.removeItem('username');
-  localStorage.removeItem('role');
-  syncAuthState();
+  clearUserAuth();
+  void syncAuthState();
   window.dispatchEvent(new Event('auth-change'));
 }
 
@@ -86,6 +105,7 @@ function switchAccount() {
 
 onMounted(() => {
   window.addEventListener('auth-change', syncAuthState);
+  void syncAuthState();
 });
 
 onBeforeUnmount(() => {
@@ -123,14 +143,9 @@ onBeforeUnmount(() => {
 
 .brand-mark {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
   background: linear-gradient(135deg, #1677ff 0%, #0f766e 100%);
   box-shadow: 0 10px 24px rgba(22, 119, 255, 0.22);
 }

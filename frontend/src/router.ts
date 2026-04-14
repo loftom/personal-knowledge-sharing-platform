@@ -13,6 +13,7 @@ import ReportPage from './views/ReportPage.vue';
 import MyContent from './views/MyContent.vue';
 import MePage from './views/MePage.vue';
 import AdminPage from './views/AdminPage.vue';
+import { getUserAuth, hasAdminSession } from './utils/auth';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -35,10 +36,12 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
-  const role = localStorage.getItem('role');
-  const token = localStorage.getItem('token');
-  if (to.path === '/admin' && role !== 'ADMIN') {
-    return token ? '/me' : '/login';
+  if (to.path.startsWith('/admin') && !hasAdminSession()) {
+    return '/login?mode=admin';
+  }
+  const token = getUserAuth().token;
+  if (to.path === '/me' && !token) {
+    return '/login';
   }
   return true;
 });
