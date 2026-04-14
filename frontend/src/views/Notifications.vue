@@ -105,7 +105,15 @@ async function markAllRead() {
 
 function openNotice(item: any) {
   if (!item?.relatedId) return;
-  router.push(item.type === 'BEST_ANSWER' ? `/qa/${item.relatedId}` : `/content/${item.relatedId}`);
+  if (item.type === 'BEST_ANSWER') {
+    router.push(`/qa/${item.relatedId}`);
+    return;
+  }
+  if (item.type === 'PRIVATE_MESSAGE') {
+    router.push(`/messages?userId=${item.relatedId}`);
+    return;
+  }
+  router.push(`/content/${item.relatedId}`);
 }
 
 onMounted(load);

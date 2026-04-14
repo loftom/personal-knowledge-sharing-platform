@@ -21,6 +21,9 @@
       </div>
 
       <div class="nav-actions">
+        <el-badge :value="messageUnreadCount" :hidden="messageUnreadCount === 0">
+          <el-button plain @click="$router.push('/messages')">私信</el-button>
+        </el-badge>
         <el-button plain @click="$router.push('/notifications')">通知</el-button>
         <template v-if="isLoggedIn">
           <span class="welcome-text">欢迎，{{ displayName }}</span>
@@ -48,6 +51,7 @@ const route = useRoute();
 const token = ref(getUserAuth().token);
 const nickname = ref(getUserAuth().nickname);
 const username = ref(getUserAuth().username);
+const messageUnreadCount = ref(0);
 
 const isLoggedIn = computed(() => !!token.value);
 const isAdminLayout = computed(() => route.path.startsWith('/admin'));
@@ -85,6 +89,13 @@ async function syncAuthState() {
   } catch {
     // Ignore profile refresh errors and keep cached auth state.
   }
+
+  try {
+    const unreadRes = await api.get('/message/unread-count');
+    messageUnreadCount.value = Number(unreadRes.data.data?.unreadCount || 0);
+  } catch {
+    messageUnreadCount.value = 0;
+  }
 }
 
 function clearAuth() {
@@ -105,11 +116,13 @@ function switchAccount() {
 
 onMounted(() => {
   window.addEventListener('auth-change', syncAuthState);
+  window.addEventListener('private-message-change', syncAuthState);
   void syncAuthState();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('auth-change', syncAuthState);
+  window.removeEventListener('private-message-change', syncAuthState);
 });
 </script>
 

@@ -156,6 +156,19 @@ CREATE TABLE IF NOT EXISTS notification (
     INDEX idx_notification_user(user_id, is_read)
 );
 
+CREATE TABLE IF NOT EXISTS private_message (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    sender_user_id BIGINT NOT NULL,
+    receiver_user_id BIGINT NOT NULL,
+    content VARCHAR(1000) NOT NULL,
+    is_read TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    read_at DATETIME NULL,
+    INDEX idx_private_message_sender(sender_user_id),
+    INDEX idx_private_message_receiver(receiver_user_id, is_read),
+    INDEX idx_private_message_created(created_at)
+);
+
 CREATE TABLE IF NOT EXISTS point_account (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,

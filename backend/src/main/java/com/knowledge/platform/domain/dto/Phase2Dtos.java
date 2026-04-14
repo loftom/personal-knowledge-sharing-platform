@@ -175,6 +175,43 @@ public class Phase2Dtos {
     }
 
     @Data
+    public static class SendPrivateMessageRequest {
+        @NotNull
+        private Long receiverUserId;
+        @NotBlank
+        private String content;
+    }
+
+    @Data
+    public static class PrivateConversationItem {
+        private Long userId;
+        private String username;
+        private String nickname;
+        private String displayName;
+        private String lastMessage;
+        private LocalDateTime lastMessageAt;
+        private Long unreadCount;
+    }
+
+    @Data
+    public static class PrivateMessageItem {
+        private Long id;
+        private Long senderUserId;
+        private String senderName;
+        private Long receiverUserId;
+        private String receiverName;
+        private String content;
+        private Integer isRead;
+        private LocalDateTime createdAt;
+        private Boolean mine;
+    }
+
+    @Data
+    public static class PrivateMessageUnreadResponse {
+        private Long unreadCount;
+    }
+
+    @Data
     public static class AuditLogItem {
         private Long id;
         private Long contentId;

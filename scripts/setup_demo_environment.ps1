@@ -158,12 +158,12 @@ function Toggle-Favorite {
 Run-H2Script -ScriptPath $sqlScript
 
 $users = @(
-    @{ username = 'admin_master'; password = 'Admin@123456'; nickname = '系统管理员' },
-    @{ username = 'author_lin'; password = 'User@123456'; nickname = '林知远' },
-    @{ username = 'author_qin'; password = 'User@123456'; nickname = '秦若溪' },
-    @{ username = 'author_song'; password = 'User@123456'; nickname = '宋明哲' },
-    @{ username = 'reader_xu'; password = 'User@123456'; nickname = '徐闻笙' },
-    @{ username = 'reader_he'; password = 'User@123456'; nickname = '何清嘉' }
+    @{ username = 'admin_master'; password = 'Admin@123456'; nickname = '绯荤粺绠＄悊鍛? },
+    @{ username = 'author_lin'; password = 'User@123456'; nickname = '鏋楃煡杩? },
+    @{ username = 'author_qin'; password = 'User@123456'; nickname = '绉﹁嫢婧? },
+    @{ username = 'author_song'; password = 'User@123456'; nickname = '瀹嬫槑鍝? },
+    @{ username = 'reader_xu'; password = 'User@123456'; nickname = '寰愰椈绗? },
+    @{ username = 'reader_he'; password = 'User@123456'; nickname = '浣曟竻鍢? }
 )
 
 foreach ($user in $users) {
@@ -171,12 +171,12 @@ foreach ($user in $users) {
 }
 
 Run-H2Sql -Sql @"
-UPDATE user SET role = 'ADMIN', nickname = '系统管理员' WHERE username = 'admin_master';
-UPDATE user SET nickname = '林知远' WHERE username = 'author_lin';
-UPDATE user SET nickname = '秦若溪' WHERE username = 'author_qin';
-UPDATE user SET nickname = '宋明哲' WHERE username = 'author_song';
-UPDATE user SET nickname = '徐闻笙' WHERE username = 'reader_xu';
-UPDATE user SET nickname = '何清嘉' WHERE username = 'reader_he';
+UPDATE user SET role = 'ADMIN', nickname = '绯荤粺绠＄悊鍛? WHERE username = 'admin_master';
+UPDATE user SET nickname = '鏋楃煡杩? WHERE username = 'author_lin';
+UPDATE user SET nickname = '绉﹁嫢婧? WHERE username = 'author_qin';
+UPDATE user SET nickname = '瀹嬫槑鍝? WHERE username = 'author_song';
+UPDATE user SET nickname = '寰愰椈绗? WHERE username = 'reader_xu';
+UPDATE user SET nickname = '浣曟竻鍢? WHERE username = 'reader_he';
 "@
 
 $adminHeaders = Login-User -Username 'admin_master' -Password 'Admin@123456'
@@ -187,43 +187,43 @@ $xuHeaders = Login-User -Username 'reader_xu' -Password 'User@123456'
 $heHeaders = Login-User -Username 'reader_he' -Password 'User@123456'
 
 $article1 = Create-Article -Headers $linHeaders `
-    -Title '在知识社区中构建审核、通知与积分联动闭环的实践' `
-    -Summary '本文围绕内容审核、作者通知与积分激励三条链路，说明知识社区如何形成稳定可持续的产品闭环。' `
+    -Title '鍦ㄧ煡璇嗙ぞ鍖轰腑鏋勫缓瀹℃牳銆侀€氱煡涓庣Н鍒嗚仈鍔ㄩ棴鐜殑瀹炶返' `
+    -Summary '鏈枃鍥寸粫鍐呭瀹℃牳銆佷綔鑰呴€氱煡涓庣Н鍒嗘縺鍔变笁鏉￠摼璺紝璇存槑鐭ヨ瘑绀惧尯濡備綍褰㈡垚绋冲畾鍙寔缁殑浜у搧闂幆銆? `
     -Body @"
-<p>一个知识社区要想建立可信度，前提是发布、审核与反馈能够形成统一且连贯的处理流程。</p>
-<p>在这套实现中，文章先进入待审核队列，再由管理员给出审核结果，最后触发作者通知与积分变更，形成完整业务闭环。</p>
-<h2>为什么这个闭环重要</h2>
-<p>没有审核，内容质量就容易失控；没有通知，作者无法理解平台反馈；没有积分激励，社区也很难形成长期稳定的创作动力。</p>
-<h2>实现中的关键决策</h2>
-<p>我统一了内容状态流转，记录每一次审核动作的日志，同时为积分奖励增加幂等业务键，避免重复审核导致重复发分。</p>
-<p>这样一来，作者拥有清晰的发布路径，管理员拥有可追溯的操作记录，平台也拥有鼓励优质创作的可靠机制。</p>
+<p>涓€涓煡璇嗙ぞ鍖鸿鎯冲缓绔嬪彲淇″害锛屽墠鎻愭槸鍙戝竷銆佸鏍镐笌鍙嶉鑳藉褰㈡垚缁熶竴涓旇繛璐殑澶勭悊娴佺▼銆?/p>
+<p>鍦ㄨ繖濂楀疄鐜颁腑锛屾枃绔犲厛杩涘叆寰呭鏍搁槦鍒楋紝鍐嶇敱绠＄悊鍛樼粰鍑哄鏍哥粨鏋滐紝鏈€鍚庤Е鍙戜綔鑰呴€氱煡涓庣Н鍒嗗彉鏇达紝褰㈡垚瀹屾暣涓氬姟闂幆銆?/p>
+<h2>涓轰粈涔堣繖涓棴鐜噸瑕?/h2>
+<p>娌℃湁瀹℃牳锛屽唴瀹硅川閲忓氨瀹规槗澶辨帶锛涙病鏈夐€氱煡锛屼綔鑰呮棤娉曠悊瑙ｅ钩鍙板弽棣堬紱娌℃湁绉垎婵€鍔憋紝绀惧尯涔熷緢闅惧舰鎴愰暱鏈熺ǔ瀹氱殑鍒涗綔鍔ㄥ姏銆?/p>
+<h2>瀹炵幇涓殑鍏抽敭鍐崇瓥</h2>
+<p>鎴戠粺涓€浜嗗唴瀹圭姸鎬佹祦杞紝璁板綍姣忎竴娆″鏍稿姩浣滅殑鏃ュ織锛屽悓鏃朵负绉垎濂栧姳澧炲姞骞傜瓑涓氬姟閿紝閬垮厤閲嶅瀹℃牳瀵艰嚧閲嶅鍙戝垎銆?/p>
+<p>杩欐牱涓€鏉ワ紝浣滆€呮嫢鏈夋竻鏅扮殑鍙戝竷璺緞锛岀鐞嗗憳鎷ユ湁鍙拷婧殑鎿嶄綔璁板綍锛屽钩鍙颁篃鎷ユ湁榧撳姳浼樿川鍒涗綔鐨勫彲闈犳満鍒躲€?/p>
 "@ `
     -CategoryId 1 -TagIds @(1, 5)
 
 $article2 = Create-Article -Headers $qinHeaders `
-    -Title '知识社区首页信息流重构：面向深度阅读与持续互动的设计思路' `
-    -Summary '本文围绕首页信息层级、筛选布局与内容卡片结构，讨论如何打造更适合知识社区的阅读体验。' `
+    -Title '鐭ヨ瘑绀惧尯棣栭〉淇℃伅娴侀噸鏋勶細闈㈠悜娣卞害闃呰涓庢寔缁簰鍔ㄧ殑璁捐鎬濊矾' `
+    -Summary '鏈枃鍥寸粫棣栭〉淇℃伅灞傜骇銆佺瓫閫夊竷灞€涓庡唴瀹瑰崱鐗囩粨鏋勶紝璁ㄨ濡備綍鎵撻€犳洿閫傚悎鐭ヨ瘑绀惧尯鐨勯槄璇讳綋楠屻€? `
     -Body @"
-<p>知识平台的首页不应该只是内容记录的堆叠，它本质上是用户发现内容的第一入口，直接影响浏览、判断与回访意愿。</p>
-<p>这次改版中，我重点关注了首屏视觉区、筛选入口的摆放方式，以及每张内容卡片中标题、摘要与元信息之间的关系。</p>
-<h2>首页首先要解决什么问题</h2>
-<p>用户需要在极短时间内理解平台主要有哪些内容，并能够通过分类、标签和排序规则快速缩小浏览范围。</p>
-<h2>为什么阅读节奏很重要</h2>
-<p>如果作者、发布时间和互动数据与标题抢占同等视觉权重，用户视线就会被打散。强化标题区、弱化次要元信息，能显著提升扫读效率。</p>
-<p>因此，一个好的首页不只是展示层，更是持续引导用户阅读、评论与发布的互动入口。</p>
+<p>鐭ヨ瘑骞冲彴鐨勯椤典笉搴旇鍙槸鍐呭璁板綍鐨勫爢鍙狅紝瀹冩湰璐ㄤ笂鏄敤鎴峰彂鐜板唴瀹圭殑绗竴鍏ュ彛锛岀洿鎺ュ奖鍝嶆祻瑙堛€佸垽鏂笌鍥炶鎰忔効銆?/p>
+<p>杩欐鏀圭増涓紝鎴戦噸鐐瑰叧娉ㄤ簡棣栧睆瑙嗚鍖恒€佺瓫閫夊叆鍙ｇ殑鎽嗘斁鏂瑰紡锛屼互鍙婃瘡寮犲唴瀹瑰崱鐗囦腑鏍囬銆佹憳瑕佷笌鍏冧俊鎭箣闂寸殑鍏崇郴銆?/p>
+<h2>棣栭〉棣栧厛瑕佽В鍐充粈涔堥棶棰?/h2>
+<p>鐢ㄦ埛闇€瑕佸湪鏋佺煭鏃堕棿鍐呯悊瑙ｅ钩鍙颁富瑕佹湁鍝簺鍐呭锛屽苟鑳藉閫氳繃鍒嗙被銆佹爣绛惧拰鎺掑簭瑙勫垯蹇€熺缉灏忔祻瑙堣寖鍥淬€?/p>
+<h2>涓轰粈涔堥槄璇昏妭濂忓緢閲嶈</h2>
+<p>濡傛灉浣滆€呫€佸彂甯冩椂闂村拰浜掑姩鏁版嵁涓庢爣棰樻姠鍗犲悓绛夎瑙夋潈閲嶏紝鐢ㄦ埛瑙嗙嚎灏变細琚墦鏁ｃ€傚己鍖栨爣棰樺尯銆佸急鍖栨瑕佸厓淇℃伅锛岃兘鏄捐憲鎻愬崌鎵鏁堢巼銆?/p>
+<p>鍥犳锛屼竴涓ソ鐨勯椤典笉鍙槸灞曠ず灞傦紝鏇存槸鎸佺画寮曞鐢ㄦ埛闃呰銆佽瘎璁轰笌鍙戝竷鐨勪簰鍔ㄥ叆鍙ｃ€?/p>
 "@ `
     -CategoryId 2 -TagIds @(2)
 
 $article3 = Create-Article -Headers $songHeaders `
-    -Title '知识社区毕业设计演示如何组织：从核心流程到亮点模块的展示方法' `
-    -Summary '本文说明如何将一期、二期和三期能力整理成清晰有说服力的答辩演示流程。' `
+    -Title '鐭ヨ瘑绀惧尯姣曚笟璁捐婕旂ず濡備綍缁勭粐锛氫粠鏍稿績娴佺▼鍒颁寒鐐规ā鍧楃殑灞曠ず鏂规硶' `
+    -Summary '鏈枃璇存槑濡備綍灏嗕竴鏈熴€佷簩鏈熷拰涓夋湡鑳藉姏鏁寸悊鎴愭竻鏅版湁璇存湇鍔涚殑绛旇京婕旂ず娴佺▼銆? `
     -Body @"
-<p>对于毕业设计来说，只有实现功能还不够，系统还需要一套能够让老师迅速理解完整产品闭环的展示结构。</p>
-<p>我将平台划分为三个阶段：第一阶段聚焦发布、审核、搜索与互动；第二阶段扩展到推荐、个人空间与通知；第三阶段突出分析、增长与治理能力。</p>
-<h2>答辩中应该重点强调什么</h2>
-<p>最有说服力的点是完整业务闭环：用户发布内容，管理员审核，审核通过后内容对外可见，互动数据被持续记录，并进一步沉淀为增长与统计分析能力。</p>
-<h2>推荐的演示顺序</h2>
-<p>建议先展示普通用户发文，再切换管理员完成审核，最后回到前端页面展示审核结果、社区评论以及作者成长数据带来的变化。</p>
+<p>瀵逛簬姣曚笟璁捐鏉ヨ锛屽彧鏈夊疄鐜板姛鑳借繕涓嶅锛岀郴缁熻繕闇€瑕佷竴濂楄兘澶熻鑰佸笀杩呴€熺悊瑙ｅ畬鏁翠骇鍝侀棴鐜殑灞曠ず缁撴瀯銆?/p>
+<p>鎴戝皢骞冲彴鍒掑垎涓轰笁涓樁娈碉細绗竴闃舵鑱氱劍鍙戝竷銆佸鏍搞€佹悳绱笌浜掑姩锛涚浜岄樁娈垫墿灞曞埌鎺ㄨ崘銆佷釜浜虹┖闂翠笌閫氱煡锛涚涓夐樁娈电獊鍑哄垎鏋愩€佸闀夸笌娌荤悊鑳藉姏銆?/p>
+<h2>绛旇京涓簲璇ラ噸鐐瑰己璋冧粈涔?/h2>
+<p>鏈€鏈夎鏈嶅姏鐨勭偣鏄畬鏁翠笟鍔￠棴鐜細鐢ㄦ埛鍙戝竷鍐呭锛岀鐞嗗憳瀹℃牳锛屽鏍搁€氳繃鍚庡唴瀹瑰澶栧彲瑙侊紝浜掑姩鏁版嵁琚寔缁褰曪紝骞惰繘涓€姝ユ矇娣€涓哄闀夸笌缁熻鍒嗘瀽鑳藉姏銆?/p>
+<h2>鎺ㄨ崘鐨勬紨绀洪『搴?/h2>
+<p>寤鸿鍏堝睍绀烘櫘閫氱敤鎴峰彂鏂囷紝鍐嶅垏鎹㈢鐞嗗憳瀹屾垚瀹℃牳锛屾渶鍚庡洖鍒板墠绔〉闈㈠睍绀哄鏍哥粨鏋溿€佺ぞ鍖鸿瘎璁轰互鍙婁綔鑰呮垚闀挎暟鎹甫鏉ョ殑鍙樺寲銆?/p>
 "@ `
     -CategoryId 1 -TagIds @(1, 3, 5)
 
@@ -236,15 +236,15 @@ foreach ($articleId in @($article1, $article2, $article3)) {
     Invoke-JsonGet -Url "$baseUrl/content/$articleId" -Headers $heHeaders | Out-Null
 }
 
-$commentA1 = Add-Comment -Headers $xuHeaders -ContentId $article1 -Body '这篇文章把审核、通知和激励闭环解释得很清楚，尤其是审核日志这一点很适合在答辩时展示。'
-$commentA2 = Add-Comment -Headers $heHeaders -ContentId $article1 -Body '我很认同这里的幂等设计，没有唯一业务键的话，重复审核确实很容易造成重复积分。'
-Add-Comment -Headers $linHeaders -ContentId $article1 -Body '这正是我在积分日志里引入业务键的原因，能大幅降低重复发奖励这类问题。' -ParentId $commentA2 | Out-Null
+$commentA1 = Add-Comment -Headers $xuHeaders -ContentId $article1 -Body '杩欑瘒鏂囩珷鎶婂鏍搞€侀€氱煡鍜屾縺鍔遍棴鐜В閲婂緱寰堟竻妤氾紝灏ゅ叾鏄鏍告棩蹇楄繖涓€鐐瑰緢閫傚悎鍦ㄧ瓟杈╂椂灞曠ず銆?
+$commentA2 = Add-Comment -Headers $heHeaders -ContentId $article1 -Body '鎴戝緢璁ゅ悓杩欓噷鐨勫箓绛夎璁★紝娌℃湁鍞竴涓氬姟閿殑璇濓紝閲嶅瀹℃牳纭疄寰堝鏄撻€犳垚閲嶅绉垎銆?
+Add-Comment -Headers $linHeaders -ContentId $article1 -Body '杩欐鏄垜鍦ㄧН鍒嗘棩蹇楅噷寮曞叆涓氬姟閿殑鍘熷洜锛岃兘澶у箙闄嶄綆閲嶅鍙戝鍔辫繖绫婚棶棰樸€? -ParentId $commentA2 | Out-Null
 
-$commentB1 = Add-Comment -Headers $linHeaders -ContentId $article2 -Body '如果首页结构做得不清晰，后面的推荐和搜索模块也很难体现价值，这篇文章把这种关系讲得很明白。'
-Add-Comment -Headers $xuHeaders -ContentId $article2 -Body '把标题和摘要放在更高优先级、弱化元信息之后，信息流确实更容易快速浏览。' -ParentId $commentB1 | Out-Null
+$commentB1 = Add-Comment -Headers $linHeaders -ContentId $article2 -Body '濡傛灉棣栭〉缁撴瀯鍋氬緱涓嶆竻鏅帮紝鍚庨潰鐨勬帹鑽愬拰鎼滅储妯″潡涔熷緢闅句綋鐜颁环鍊硷紝杩欑瘒鏂囩珷鎶婅繖绉嶅叧绯昏寰楀緢鏄庣櫧銆?
+Add-Comment -Headers $xuHeaders -ContentId $article2 -Body '鎶婃爣棰樺拰鎽樿鏀惧湪鏇撮珮浼樺厛绾с€佸急鍖栧厓淇℃伅涔嬪悗锛屼俊鎭祦纭疄鏇村鏄撳揩閫熸祻瑙堛€? -ParentId $commentB1 | Out-Null
 
-$commentC1 = Add-Comment -Headers $heHeaders -ContentId $article3 -Body '把平台拆成三个阶段来讲，非常适合在毕业答辩里说明范围边界和模块亮点。'
-Add-Comment -Headers $songHeaders -ContentId $article3 -Body '是的，而且这样也能让演示顺序从发布、审核自然过渡到互动与增长分析。' -ParentId $commentC1 | Out-Null
+$commentC1 = Add-Comment -Headers $heHeaders -ContentId $article3 -Body '鎶婂钩鍙版媶鎴愪笁涓樁娈垫潵璁诧紝闈炲父閫傚悎鍦ㄦ瘯涓氱瓟杈╅噷璇存槑鑼冨洿杈圭晫鍜屾ā鍧椾寒鐐广€?
+Add-Comment -Headers $songHeaders -ContentId $article3 -Body '鏄殑锛岃€屼笖杩欐牱涔熻兘璁╂紨绀洪『搴忎粠鍙戝竷銆佸鏍歌嚜鐒惰繃娓″埌浜掑姩涓庡闀垮垎鏋愩€? -ParentId $commentC1 | Out-Null
 
 Toggle-Like -Headers $xuHeaders -TargetId $article1 -TargetType 'CONTENT'
 Toggle-Like -Headers $heHeaders -TargetId $article1 -TargetType 'CONTENT'
@@ -264,17 +264,17 @@ Toggle-Like -Headers $songHeaders -TargetId $commentC1 -TargetType 'COMMENT'
 
 $summary = [pscustomobject]@{
     accounts = @(
-        @{ role = 'ADMIN'; username = 'admin_master'; password = 'Admin@123456'; nickname = '系统管理员' },
-        @{ role = 'USER'; username = 'author_lin'; password = 'User@123456'; nickname = '林知远' },
-        @{ role = 'USER'; username = 'author_qin'; password = 'User@123456'; nickname = '秦若溪' },
-        @{ role = 'USER'; username = 'author_song'; password = 'User@123456'; nickname = '宋明哲' },
-        @{ role = 'USER'; username = 'reader_xu'; password = 'User@123456'; nickname = '徐闻笙' },
-        @{ role = 'USER'; username = 'reader_he'; password = 'User@123456'; nickname = '何清嘉' }
+        @{ role = 'ADMIN'; username = 'admin_master'; password = 'Admin@123456'; nickname = '绯荤粺绠＄悊鍛? },
+        @{ role = 'USER'; username = 'author_lin'; password = 'User@123456'; nickname = '鏋楃煡杩? },
+        @{ role = 'USER'; username = 'author_qin'; password = 'User@123456'; nickname = '绉﹁嫢婧? },
+        @{ role = 'USER'; username = 'author_song'; password = 'User@123456'; nickname = '瀹嬫槑鍝? },
+        @{ role = 'USER'; username = 'reader_xu'; password = 'User@123456'; nickname = '寰愰椈绗? },
+        @{ role = 'USER'; username = 'reader_he'; password = 'User@123456'; nickname = '浣曟竻鍢? }
     )
     articles = @(
-        @{ id = $article1; title = '在知识社区中构建审核、通知与积分联动闭环的实践' },
-        @{ id = $article2; title = '知识社区首页信息流重构：面向深度阅读与持续互动的设计思路' },
-        @{ id = $article3; title = '知识社区毕业设计演示如何组织：从核心流程到亮点模块的展示方法' }
+        @{ id = $article1; title = '鍦ㄧ煡璇嗙ぞ鍖轰腑鏋勫缓瀹℃牳銆侀€氱煡涓庣Н鍒嗚仈鍔ㄩ棴鐜殑瀹炶返' },
+        @{ id = $article2; title = '鐭ヨ瘑绀惧尯棣栭〉淇℃伅娴侀噸鏋勶細闈㈠悜娣卞害闃呰涓庢寔缁簰鍔ㄧ殑璁捐鎬濊矾' },
+        @{ id = $article3; title = '鐭ヨ瘑绀惧尯姣曚笟璁捐婕旂ず濡備綍缁勭粐锛氫粠鏍稿績娴佺▼鍒颁寒鐐规ā鍧楃殑灞曠ず鏂规硶' }
     )
 }
 

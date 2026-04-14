@@ -9,7 +9,8 @@
             <h1>{{ profile.name }}</h1>
             <p>展示作者的公开内容、粉丝规模和持续创作表现，便于进一步关注与交流。</p>
           </div>
-          <div class="hero-actions" v-if="canFollow">
+          <div class="hero-actions" v-if="canFollow || canMessage">
+            <el-button v-if="canMessage" plain @click="goMessage">发私信</el-button>
             <el-button type="primary" :loading="followLoading" @click="toggleFollow">
               {{ following ? '取消关注' : '关注作者' }}
             </el-button>
@@ -60,11 +61,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '../api';
 
 const route = useRoute();
+const router = useRouter();
 const id = route.params.id as string | undefined;
 
 const profile = ref<any>(null);
@@ -75,6 +77,7 @@ const following = ref(false);
 const currentUserId = Number(localStorage.getItem('userId') || 0);
 const targetUserId = computed(() => Number(id || currentUserId || 0));
 const canFollow = computed(() => !!id && currentUserId > 0 && targetUserId.value !== currentUserId);
+const canMessage = computed(() => !!id && currentUserId > 0 && targetUserId.value !== currentUserId);
 
 function sanitizeDisplayName(rawNickname?: string, rawUsername?: string) {
   const nicknameValue = (rawNickname || '').trim();
@@ -140,6 +143,14 @@ async function toggleFollow() {
   } finally {
     followLoading.value = false;
   }
+}
+
+function goMessage() {
+  if (!localStorage.getItem('token')) {
+    ElMessage.warning('请先登录后再发送私信');
+    return;
+  }
+  router.push(`/messages?userId=${targetUserId.value}`);
 }
 
 onMounted(load);

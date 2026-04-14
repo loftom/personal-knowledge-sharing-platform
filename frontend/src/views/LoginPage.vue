@@ -2,13 +2,13 @@
   <div class="login-page">
     <div class="login-panel">
       <div class="hero">
-        <div class="hero-badge">{{ isAdminMode ? '后台登录入口' : '账号入口' }}</div>
-        <h2>{{ isAdminMode ? '登录管理后台' : '登录知识社区' }}</h2>
+        <div class="hero-badge">{{ isAdminMode ? '后台登录入口' : '快捷账号体验' }}</div>
+        <h2>{{ isAdminMode ? '系统后台登录' : '登录知识分享平台' }}</h2>
         <p v-if="isAdminMode">
-          当前页面将以独立后台会话登录管理员账号，不会覆盖前台普通用户的登录状态，适合管理员与用户双开测试。
+          使用管理员账号进入后台，可查看审核、分类标签、用户画像与平台统计数据。后台登录会使用独立会话，不会覆盖前台普通用户的登录状态。
         </p>
         <p v-else>
-          登录后可进入内容创作、个人工作台与社区互动流程。管理员如需独立进入后台，请使用“进入后台”按钮打开后台登录。
+          这里提供演示账号与注册入口。你可以直接选择快捷账号体验文章、问答、推荐与个人空间，也可以注册新账号开始完整使用流程。
         </p>
 
         <div class="hero-actions">
@@ -26,12 +26,17 @@
             plain
             @click="router.push('/login')"
           >
-            返回用户登录
+            返回前台登录
           </el-button>
         </div>
 
         <div class="preset-list">
-          <button v-for="account in accounts" :key="account.username" class="preset-card" @click="fillAccount(account)">
+          <button
+            v-for="account in accounts"
+            :key="account.username"
+            class="preset-card"
+            @click="fillAccount(account)"
+          >
             <span class="preset-role">{{ account.label }}</span>
             <strong>{{ account.nickname }}</strong>
             <small>{{ account.username }} / {{ account.password }}</small>
@@ -50,9 +55,15 @@
                 <el-input v-model="loginForm.password" type="password" placeholder="请输入密码" size="large" show-password />
               </el-form-item>
               <div class="account-tip">
-                {{ isAdminMode ? '后台登录仅接受管理员账号，登录成功后将进入独立后台会话。' : '点击左侧账号卡片后，可直接使用当前表单完成登录。' }}
+                {{
+                  isAdminMode
+                    ? '管理员登录只允许使用后台账号，登录成功后会进入独立后台，不会影响前台普通用户会话。'
+                    : '普通用户可直接使用快捷账号，也可以注册新账号后再登录体验。'
+                }}
               </div>
-              <el-button class="login-btn" type="primary" size="large" :loading="submitting" @click="login()">登录</el-button>
+              <el-button class="login-btn" type="primary" size="large" :loading="submitting" @click="login()">
+                登录
+              </el-button>
             </el-form>
           </el-tab-pane>
 
@@ -106,18 +117,33 @@ const registerForm = reactive({ username: '', nickname: '', password: '' });
 
 const presetAccounts: ShortcutAccount[] = [
   { label: '管理员', nickname: '系统管理员', username: 'admin_master', password: 'Admin@123456' },
-  { label: '作者账号', nickname: '林知远', username: 'author_lin', password: 'User@123456' },
-  { label: '作者账号', nickname: '秦若溪', username: 'author_qin', password: 'User@123456' },
-  { label: '作者账号', nickname: '宋明哲', username: 'author_song', password: 'User@123456' },
-  { label: '普通用户', nickname: '徐闻笙', username: 'reader_xu', password: 'User@123456' },
-  { label: '普通用户', nickname: '何清嘉', username: 'reader_he', password: 'User@123456' },
-  { label: '新增作者', nickname: '陈以衡', username: 'author_chen', password: 'User@123456' },
-  { label: '新增作者', nickname: '罗清越', username: 'author_luo', password: 'User@123456' },
-  { label: '新增作者', nickname: '顾明安', username: 'author_gu', password: 'User@123456' },
-  { label: '新增读者', nickname: '谭书言', username: 'reader_tan', password: 'User@123456' },
-  { label: '新增读者', nickname: '周沐禾', username: 'reader_zhou', password: 'User@123456' },
-  { label: '新增读者', nickname: '吴知夏', username: 'reader_wu', password: 'User@123456' }
+  { label: '基础作者', nickname: '林知远', username: 'author_lin', password: 'User@123456' },
+  { label: '基础作者', nickname: '秦若溪', username: 'author_qin', password: 'User@123456' },
+  { label: '基础作者', nickname: '宋明哲', username: 'author_song', password: 'User@123456' },
+  { label: '基础读者', nickname: '徐闻笙', username: 'reader_xu', password: 'User@123456' },
+  { label: '基础读者', nickname: '何清嘉', username: 'reader_he', password: 'User@123456' },
+  { label: '扩展作者', nickname: '陈以衡', username: 'author_chen', password: 'User@123456' },
+  { label: '扩展作者', nickname: '罗清越', username: 'author_luo', password: 'User@123456' },
+  { label: '扩展作者', nickname: '顾明安', username: 'author_gu', password: 'User@123456' },
+  { label: '扩展读者', nickname: '谭书言', username: 'reader_tan', password: 'User@123456' },
+  { label: '扩展读者', nickname: '周沐禾', username: 'reader_zhou', password: 'User@123456' },
+  { label: '扩展读者', nickname: '吴知夏', username: 'reader_wu', password: 'User@123456' }
 ];
+
+const canonicalShortcutAccounts: Record<string, Pick<ShortcutAccount, 'label' | 'nickname'>> = {
+  admin_master: { label: '管理员', nickname: '系统管理员' },
+  author_lin: { label: '基础作者', nickname: '林知远' },
+  author_qin: { label: '基础作者', nickname: '秦若溪' },
+  author_song: { label: '基础作者', nickname: '宋明哲' },
+  reader_xu: { label: '基础读者', nickname: '徐闻笙' },
+  reader_he: { label: '基础读者', nickname: '何清嘉' },
+  author_chen: { label: '扩展作者', nickname: '陈以衡' },
+  author_luo: { label: '扩展作者', nickname: '罗清越' },
+  author_gu: { label: '扩展作者', nickname: '顾明安' },
+  reader_tan: { label: '扩展读者', nickname: '谭书言' },
+  reader_zhou: { label: '扩展读者', nickname: '周沐禾' },
+  reader_wu: { label: '扩展读者', nickname: '吴知夏' }
+};
 
 const customAccounts = ref<ShortcutAccount[]>([]);
 const removedShortcutUsernames = ref<string[]>([]);
@@ -150,7 +176,7 @@ function loadCustomAccounts(): ShortcutAccount[] {
     return parsed
       .filter((item) => item && typeof item.username === 'string' && typeof item.password === 'string')
       .map((item) => ({
-        label: typeof item.label === 'string' && item.label.trim() ? item.label : '新注册用户',
+        label: typeof item.label === 'string' && item.label.trim() ? item.label : '注册用户',
         nickname: typeof item.nickname === 'string' ? item.nickname : item.username,
         username: item.username,
         password: item.password
@@ -158,6 +184,20 @@ function loadCustomAccounts(): ShortcutAccount[] {
   } catch {
     return [];
   }
+}
+
+function normalizeShortcutAccounts(items: ShortcutAccount[]): ShortcutAccount[] {
+  return items.map((item) => {
+    const canonical = canonicalShortcutAccounts[item.username];
+    if (!canonical) {
+      return item;
+    }
+    return {
+      ...item,
+      label: canonical.label,
+      nickname: canonical.nickname
+    };
+  });
 }
 
 function loadRemovedShortcutUsernames(): string[] {
@@ -185,7 +225,9 @@ function persistRemovedShortcutUsernames() {
 }
 
 function refreshCustomAccounts() {
-  customAccounts.value = loadCustomAccounts();
+  const nextCustomAccounts = normalizeShortcutAccounts(loadCustomAccounts());
+  customAccounts.value = nextCustomAccounts;
+  persistCustomAccounts();
   removedShortcutUsernames.value = loadRemovedShortcutUsernames();
 }
 
@@ -203,8 +245,10 @@ function clearRemovedShortcutUsername(username: string) {
 
 function upsertShortcutAccount(account: ShortcutAccount) {
   clearRemovedShortcutUsername(account.username);
+  const canonical = canonicalShortcutAccounts[account.username];
+  const nextAccount = canonical ? { ...account, ...canonical } : account;
   const next = [
-    account,
+    nextAccount,
     ...customAccounts.value.filter((item) => item.username !== account.username)
   ];
   customAccounts.value = next.slice(0, 8);
@@ -229,7 +273,7 @@ async function login(account?: { username: string; password: string }) {
     if (isAdminMode.value) {
       if (nextRole !== 'ADMIN') {
         clearAdminAuth();
-        ElMessage.error('后台登录仅支持管理员账号');
+        ElMessage.error('后台登录仅允许管理员账号');
         return;
       }
       setAdminAuth({
@@ -263,7 +307,7 @@ async function login(account?: { username: string; password: string }) {
       label:
         customAccounts.value.find((item) => item.username === nextUsername)?.label ||
         presetAccounts.find((item) => item.username === nextUsername)?.label ||
-        '新注册用户',
+        '注册用户',
       nickname: nextNickname,
       username: nextUsername,
       password: payload.password
@@ -281,19 +325,19 @@ async function login(account?: { username: string; password: string }) {
 
 async function register() {
   if (!registerForm.username.trim() || !registerForm.nickname.trim() || !registerForm.password.trim()) {
-    ElMessage.warning('请完整填写用户名、昵称和密码');
+    ElMessage.warning('请输入完整的用户名、昵称和密码');
     return;
   }
   submitting.value = true;
   try {
     await api.post('/auth/register', registerForm);
     upsertShortcutAccount({
-      label: '新注册用户',
+      label: '注册用户',
       nickname: registerForm.nickname.trim(),
       username: registerForm.username.trim(),
       password: registerForm.password
     });
-    ElMessage.success('注册成功，请直接登录');
+    ElMessage.success('注册成功，请登录');
     loginForm.username = registerForm.username;
     loginForm.password = registerForm.password;
     registerForm.username = '';

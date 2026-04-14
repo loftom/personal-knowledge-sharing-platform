@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$BaseUrl = 'http://localhost:8080/api',
     [string]$MySqlContainer = 'knowledge-platform-mysql',
     [string]$MySqlDatabase = 'knowledge_platform',

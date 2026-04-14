@@ -13,6 +13,7 @@ import ReportPage from './views/ReportPage.vue';
 import MyContent from './views/MyContent.vue';
 import MePage from './views/MePage.vue';
 import AdminPage from './views/AdminPage.vue';
+import MessagesPage from './views/MessagesPage.vue';
 import { getUserAuth, hasAdminSession } from './utils/auth';
 
 const router = createRouter({
@@ -30,6 +31,7 @@ const router = createRouter({
     { path: '/report', component: ReportPage },
     { path: '/followers', component: Followers },
     { path: '/notifications', component: Notifications },
+    { path: '/messages', component: MessagesPage },
     { path: '/me', component: MePage },
     { path: '/admin', component: AdminPage }
   ]
