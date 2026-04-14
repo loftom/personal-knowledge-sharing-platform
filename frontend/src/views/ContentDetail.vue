@@ -235,7 +235,7 @@ async function loadDetail(incrementView = true, silent = false) {
   }
   try {
     const [contentRes, commentRes] = await Promise.all([
-      api.get(`/content/${id}`, { params: { incrementView } }),
+      api.get(`/public/content/${id}`, { params: { incrementView } }),
       api.get(`/interaction/comment/${id}`)
     ]);
     content.value = contentRes.data.data;

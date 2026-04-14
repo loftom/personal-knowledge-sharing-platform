@@ -47,7 +47,6 @@
             <div class="answer-body" v-html="answer.body"></div>
             <div class="answer-meta">
               <span>回答者：{{ answer.displayName || answer.nickname || `用户 ${answer.userId}` }}</span>
-              <span>点赞 {{ answer.likeCount || 0 }}</span>
               <span>{{ formatTime(answer.createdAt) }}</span>
             </div>
             <div class="answer-actions">
@@ -144,7 +143,7 @@ async function load() {
   loading.value = true;
   try {
     const [contentRes, answerRes, stateRes] = await Promise.all([
-      api.get(`/content/${id}`),
+      api.get(`/public/content/${id}`),
       api.get(`/qa/${id}/answers`),
       api.get(`/qa/${id}/state`)
     ]);
@@ -334,18 +333,22 @@ h2 {
   border-color: rgba(34, 197, 94, 0.35);
   box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.2);
   background: linear-gradient(135deg, rgba(240, 253, 244, 0.94), rgba(255, 255, 255, 0.98));
+  padding-top: 56px;
 }
 
 .best-banner {
   position: absolute;
-  top: 14px;
-  right: 16px;
+  top: 16px;
+  right: 18px;
   padding: 6px 10px;
   border-radius: 999px;
   background: #16a34a;
   color: #fff;
   font-size: 12px;
   font-weight: 700;
+  max-width: calc(100% - 36px);
+  line-height: 1;
+  z-index: 1;
 }
 
 .answer-body {

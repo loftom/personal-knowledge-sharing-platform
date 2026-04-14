@@ -271,7 +271,7 @@ async function login(account?: { username: string; password: string }) {
     window.dispatchEvent(new Event('auth-change'));
     window.dispatchEvent(new Event('login-shortcuts-change'));
     ElMessage.success('登录成功');
-    router.push('/');
+    router.push(String(route.query.redirect || '/'));
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '登录失败');
   } finally {
@@ -311,6 +311,9 @@ onMounted(() => {
   refreshCustomAccounts();
   if (isAdminMode.value) {
     activeTab.value = 'login';
+  }
+  if (route.query.reason === 'login-required') {
+    ElMessage.warning('请先登录后再访问该页面');
   }
   window.addEventListener('login-shortcuts-change', refreshCustomAccounts);
   window.addEventListener('storage', refreshCustomAccounts);

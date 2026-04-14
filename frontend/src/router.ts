@@ -35,14 +35,26 @@ const router = createRouter({
   ]
 });
 
+function isGuestAccessible(path: string) {
+  return (
+    path === '/' ||
+    path === '/login' ||
+    path === '/qa' ||
+    path.startsWith('/qa/') ||
+    path.startsWith('/content/')
+  );
+}
+
 router.beforeEach((to) => {
   if (to.path.startsWith('/admin') && !hasAdminSession()) {
     return '/login?mode=admin';
   }
+
   const token = getUserAuth().token;
-  if (to.path === '/me' && !token) {
-    return '/login';
+  if (!token && !to.path.startsWith('/admin') && !isGuestAccessible(to.path)) {
+    return `/login?reason=login-required&redirect=${encodeURIComponent(to.fullPath)}`;
   }
+
   return true;
 });
 
