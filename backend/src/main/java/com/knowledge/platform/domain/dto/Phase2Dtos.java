@@ -283,4 +283,45 @@ public class Phase2Dtos {
         private Integer tagCount;
         private List<UserPreferenceTag> preferences;
     }
+
+    @Data
+    public static class AdminUserItem {
+        private Long id;
+        private String username;
+        private String nickname;
+        private String role;
+        private Integer status;
+        private Long contentCount;
+        private Long publishedContentCount;
+        private LocalDateTime createdAt;
+    }
+
+    @Data
+    public static class UpdateUserStatusRequest {
+        @NotNull
+        private Integer status;
+    }
+
+    @Data
+    public static class AdminContentItem {
+        private Long id;
+        private String title;
+        private String type;
+        private String status;
+        private String visibility;
+        private Long authorId;
+        private String authorName;
+        private Long viewCount;
+        private Long likeCount;
+        private Long favoriteCount;
+        private LocalDateTime createdAt;
+        private LocalDateTime publishedAt;
+    }
+
+    @Data
+    public static class UpdateContentStatusRequest {
+        @NotBlank
+        private String status;
+        private String reason;
+    }
 }

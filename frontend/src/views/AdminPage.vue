@@ -36,6 +36,9 @@
           <button class="menu-item" :class="{ active: activeView === 'preference' }" @click="activeView = 'preference'">
             用户偏好
           </button>
+          <button class="menu-item" :class="{ active: activeView === 'manage' }" @click="activeView = 'manage'">
+            用户与内容管理
+          </button>
         </div>
 
         <div class="sidebar-footer">
@@ -170,6 +173,7 @@
         <section v-else class="module-panel">
           <AdminAuditPage v-if="activeView === 'audit'" />
           <AdminPreferencePage v-else-if="activeView === 'preference'" />
+          <AdminManagePage v-else-if="activeView === 'manage'" />
           <TaxonomyManage v-else />
         </section>
       </template>
@@ -186,8 +190,9 @@ import { getAdminAuth, hasAdminSession } from '../utils/auth';
 import TaxonomyManage from './TaxonomyManage.vue';
 import AdminAuditPage from './AdminAuditPage.vue';
 import AdminPreferencePage from './AdminPreferencePage.vue';
+import AdminManagePage from './AdminManagePage.vue';
 
-type AdminView = 'overview' | 'audit' | 'preference' | 'taxonomy';
+type AdminView = 'overview' | 'audit' | 'preference' | 'taxonomy' | 'manage';
 
 const router = useRouter();
 const isAdmin = computed(() => hasAdminSession());
@@ -202,6 +207,7 @@ const tags = ref<any[]>([]);
 const currentLabel = computed(() => {
   if (activeView.value === 'audit') return '审核管理';
   if (activeView.value === 'preference') return '用户偏好';
+  if (activeView.value === 'manage') return '用户与内容管理';
   if (activeView.value === 'taxonomy') return '分类标签';
   return '数据概览';
 });
@@ -209,6 +215,7 @@ const currentLabel = computed(() => {
 const currentTitle = computed(() => {
   if (activeView.value === 'audit') return '内容审核中心';
   if (activeView.value === 'preference') return '用户偏好洞察';
+  if (activeView.value === 'manage') return '用户与内容管理';
   if (activeView.value === 'taxonomy') return '分类与标签管理';
   return '后台数据概览';
 });

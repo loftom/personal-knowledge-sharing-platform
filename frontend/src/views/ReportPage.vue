@@ -95,6 +95,43 @@
           </div>
         </div>
 
+        <div class="chart-grid">
+          <div class="trend-section">
+            <div class="trend-head">
+              <h3>互动结构环图</h3>
+              <p>对比点赞、收藏、评论在当前账号互动中的占比。</p>
+            </div>
+            <div class="donut-wrap">
+              <div class="donut" :style="{ background: interactionConic }">
+                <div class="donut-center">
+                  <strong>{{ totalInteractions }}</strong>
+                  <span>总互动</span>
+                </div>
+              </div>
+              <div class="donut-legend">
+                <div v-for="item in interactionItems" :key="item.label" class="legend-item">
+                  <i :style="{ background: item.color }"></i>
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="trend-section">
+            <div class="trend-head">
+              <h3>阅读趋势折线图</h3>
+              <p>展示最近 7 天阅读变化，便于说明流量波动。</p>
+            </div>
+            <svg class="line-chart" viewBox="0 0 640 220" preserveAspectRatio="none">
+              <line x1="36" y1="180" x2="612" y2="180" stroke="#cbd5e1" stroke-width="1" />
+              <polyline :points="viewPolyline" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+              <circle v-for="point in viewPoints" :key="point.key" :cx="point.x" :cy="point.y" r="4" fill="#1d4ed8" />
+              <text v-for="point in viewPoints" :key="`label-${point.key}`" :x="point.x" y="202" text-anchor="middle" fill="#64748b" font-size="11">{{ point.label }}</text>
+            </svg>
+          </div>
+        </div>
+
         <div class="trend-section">
           <h3>最近积分流水</h3>
           <el-timeline v-if="(report.recentPointLogs || []).length > 0">
@@ -128,6 +165,42 @@ const maxViews = computed(() => Math.max(...trends.value.map((item: any) => item
 const maxLikes = computed(() => Math.max(...trends.value.map((item: any) => item.likes || 0), 1));
 const maxFavorites = computed(() => Math.max(...trends.value.map((item: any) => item.favorites || 0), 1));
 const maxPoints = computed(() => Math.max(...trends.value.map((item: any) => item.pointDelta || 0), 1));
+
+const interactionItems = computed(() => [
+  { label: '点赞', value: Number(report.value?.totalLikes || 0), color: '#f97316' },
+  { label: '收藏', value: Number(report.value?.totalFavorites || 0), color: '#7c3aed' },
+  { label: '评论', value: Number(report.value?.totalCommentsReceived || 0), color: '#16a34a' }
+]);
+
+const totalInteractions = computed(() => interactionItems.value.reduce((sum, item) => sum + item.value, 0));
+
+const interactionConic = computed(() => {
+  const total = Math.max(totalInteractions.value, 1);
+  let start = 0;
+  const slices = interactionItems.value.map((item) => {
+    const percent = (item.value / total) * 100;
+    const from = start;
+    start += percent;
+    return `${item.color} ${from.toFixed(2)}% ${start.toFixed(2)}%`;
+  });
+  return `conic-gradient(${slices.join(',')})`;
+});
+
+const viewPoints = computed(() => {
+  const items = trends.value;
+  if (!items.length) {
+    return [] as Array<{ key: string; x: number; y: number; label: string }>;
+  }
+  const max = Math.max(...items.map((item: any) => Number(item.views || 0)), 1);
+  return items.map((item: any, index: number) => {
+    const x = 36 + (576 / Math.max(items.length - 1, 1)) * index;
+    const ratio = Number(item.views || 0) / max;
+    const y = 180 - ratio * 130;
+    return { key: item.dateLabel, x, y, label: item.dateLabel.slice(5) };
+  });
+});
+
+const viewPolyline = computed(() => viewPoints.value.map((point) => `${point.x},${point.y}`).join(' '));
 
 const trendSummary = computed(() => {
   const items = trends.value;
@@ -208,10 +281,22 @@ onMounted(load);
 .legend-row { display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; color:#475569; font-size:13px; }
 .legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
 .views { background:#0ea5e9; } .likes { background:#f97316; } .favorites { background:#7c3aed; } .points { background:#16a34a; }
+.chart-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.donut-wrap { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.donut { width:180px; height:180px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.donut-center { width:120px; height:120px; border-radius:50%; background:#fff; display:grid; place-items:center; box-shadow:inset 0 0 0 1px rgba(148,163,184,.18); }
+.donut-center strong { font-size:24px; color:#0f172a; }
+.donut-center span { color:#64748b; font-size:12px; }
+.donut-legend { display:grid; gap:10px; min-width:180px; }
+.legend-item { display:flex; align-items:center; gap:8px; color:#475569; }
+.legend-item i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.legend-item strong { margin-left:auto; color:#0f172a; }
+.line-chart { width:100%; height:220px; background:linear-gradient(180deg,#f8fbff 0%,#ffffff 100%); border-radius:14px; }
 .point-log-line { display:flex; gap:10px; align-items:center; }
 .gain { color:#16a34a; } .loss { color:#dc2626; }
 @media (max-width: 920px) {
   .stat-grid, .summary-grid, .insight-grid { grid-template-columns:1fr; }
+  .chart-grid { grid-template-columns:1fr; }
   .trend-chart { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .trend-head { flex-direction:column; align-items:flex-start; }
 }

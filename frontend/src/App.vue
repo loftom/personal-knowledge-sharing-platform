@@ -116,6 +116,7 @@ async function syncUnreadCount() {
 
 function handleRealtimeEvent(event: RealtimeEvent) {
   void syncUnreadCount();
+  window.dispatchEvent(new CustomEvent('realtime-event', { detail: event }));
   if (event.type === 'private-message' || event.type === 'notification-read') {
     window.dispatchEvent(new Event('private-message-change'));
   }

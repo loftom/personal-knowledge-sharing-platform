@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
@@ -206,7 +206,26 @@ async function reopenQuestion() {
   }
 }
 
-onMounted(load);
+function handleRealtime(event: Event) {
+  const payload = (event as CustomEvent).detail as { type?: string; data?: any } | undefined;
+  const eventType = payload?.type || '';
+  if (eventType !== 'qa-answer' && eventType !== 'qa-state-changed') {
+    return;
+  }
+  const questionId = Number(payload?.data?.questionId || 0);
+  if (questionId === Number(id)) {
+    void load();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('realtime-event', handleRealtime as EventListener);
+  void load();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('realtime-event', handleRealtime as EventListener);
+});
 </script>
 
 <style scoped>

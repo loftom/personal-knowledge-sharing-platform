@@ -21,8 +21,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -223,6 +225,122 @@ public class AdminService {
         contentMapper.updateById(content);
         pointService.penalizeOffline(content.getAuthorId(), content.getId());
         saveAudit(contentId, "OFFLINE", reason == null ? "Admin offline" : reason);
+    }
+
+    public List<Phase2Dtos.AdminUserItem> users(String keyword, Integer status) {
+        requireAdmin();
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>().orderByDesc(User::getCreatedAt);
+        if (status != null && (status == 0 || status == 1)) {
+            wrapper.eq(User::getStatus, status);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.and(w -> w.like(User::getUsername, keyword).or().like(User::getNickname, keyword));
+        }
+
+        List<User> users = userMapper.selectList(wrapper);
+        List<Content> contents = contentMapper.selectList(new LambdaQueryWrapper<Content>());
+        Map<Long, Long> contentCountMap = contents.stream().collect(Collectors.groupingBy(Content::getAuthorId, Collectors.counting()));
+        Map<Long, Long> publishedContentCountMap = contents.stream()
+                .filter(content -> "PUBLISHED".equalsIgnoreCase(content.getStatus()))
+                .collect(Collectors.groupingBy(Content::getAuthorId, Collectors.counting()));
+
+        return users.stream().map(user -> {
+            Phase2Dtos.AdminUserItem item = new Phase2Dtos.AdminUserItem();
+            item.setId(user.getId());
+            item.setUsername(user.getUsername());
+            item.setNickname(user.getNickname());
+            item.setRole(user.getRole());
+            item.setStatus(user.getStatus());
+            item.setContentCount(contentCountMap.getOrDefault(user.getId(), 0L));
+            item.setPublishedContentCount(publishedContentCountMap.getOrDefault(user.getId(), 0L));
+            item.setCreatedAt(user.getCreatedAt());
+            return item;
+        }).toList();
+    }
+
+    public void updateUserStatus(Long userId, Integer status) {
+        requireAdmin();
+        if (status == null || (status != 0 && status != 1)) {
+            throw new AppException("Invalid user status");
+        }
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new AppException("User not found");
+        }
+        if ("ADMIN".equalsIgnoreCase(user.getRole()) && status == 0) {
+            throw new AppException("管理员账号不能停用");
+        }
+        user.setStatus(status);
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    public List<Phase2Dtos.AdminContentItem> manageContents(String keyword, String status, String type, Long authorId) {
+        requireAdmin();
+        LambdaQueryWrapper<Content> wrapper = new LambdaQueryWrapper<Content>().orderByDesc(Content::getCreatedAt);
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.and(w -> w.like(Content::getTitle, keyword).or().like(Content::getSummary, keyword));
+        }
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+            wrapper.eq(Content::getStatus, status);
+        }
+        if (type != null && !type.isBlank() && !"ALL".equalsIgnoreCase(type)) {
+            wrapper.eq(Content::getType, type);
+        }
+        if (authorId != null && authorId > 0) {
+            wrapper.eq(Content::getAuthorId, authorId);
+        }
+
+        List<Content> contents = contentMapper.selectList(wrapper);
+        Set<Long> authorIds = new HashSet<>(contents.stream().map(Content::getAuthorId).toList());
+        Map<Long, User> userMap = userMapper.selectBatchIds(authorIds).stream().collect(Collectors.toMap(User::getId, user -> user));
+
+        return contents.stream().map(content -> {
+            Phase2Dtos.AdminContentItem item = new Phase2Dtos.AdminContentItem();
+            item.setId(content.getId());
+            item.setTitle(content.getTitle());
+            item.setType(content.getType());
+            item.setStatus(content.getStatus());
+            item.setVisibility(content.getVisibility());
+            item.setAuthorId(content.getAuthorId());
+            item.setAuthorName(resolveDisplayName(userMap.get(content.getAuthorId())));
+            item.setViewCount(content.getViewCount());
+            item.setLikeCount(content.getLikeCount());
+            item.setFavoriteCount(content.getFavoriteCount());
+            item.setCreatedAt(content.getCreatedAt());
+            item.setPublishedAt(content.getPublishedAt());
+            return item;
+        }).toList();
+    }
+
+    public void updateContentStatus(Long contentId, String nextStatus, String reason) {
+        requireAdmin();
+        if (nextStatus == null || nextStatus.isBlank()) {
+            throw new AppException("Status is required");
+        }
+        String status = nextStatus.trim().toUpperCase();
+        if (!List.of("PENDING_REVIEW", "PUBLISHED", "REJECTED", "OFFLINE").contains(status)) {
+            throw new AppException("Invalid content status");
+        }
+        Content content = contentMapper.selectById(contentId);
+        if (content == null) {
+            throw new AppException("Content not found");
+        }
+
+        String previousStatus = content.getStatus();
+        content.setStatus(status);
+        if ("PUBLISHED".equals(status) && content.getPublishedAt() == null) {
+            content.setPublishedAt(LocalDateTime.now());
+        }
+        if (!"PUBLISHED".equals(status)) {
+            content.setUpdatedAt(LocalDateTime.now());
+        }
+        contentMapper.updateById(content);
+
+        if ("OFFLINE".equals(status) && "PUBLISHED".equals(previousStatus)) {
+            pointService.penalizeOffline(content.getAuthorId(), content.getId());
+        }
+        saveAudit(contentId, "MANAGE_STATUS", (reason == null || reason.isBlank()) ? ("Set status to " + status) : reason);
     }
 
     private void saveAudit(Long contentId, String action, String reason) {

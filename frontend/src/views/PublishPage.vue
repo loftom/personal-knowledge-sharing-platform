@@ -93,7 +93,9 @@
 
             <div v-if="uploadedAssets.length > 0" class="asset-strip">
               <span v-for="asset in uploadedAssets" :key="asset.url" class="asset-chip">
-                {{ asset.kind === 'image' ? '图片' : '附件' }}：{{ asset.name }}
+                <span>{{ asset.kind === 'image' ? '图片' : '附件' }}：{{ asset.name }}</span>
+                <button type="button" class="asset-btn" @click="insertAsset(asset)">插入</button>
+                <button type="button" class="asset-btn danger" @click="removeAsset(asset.url)">移除</button>
               </span>
             </div>
 
@@ -283,6 +285,18 @@ async function uploadAsset(file: File, kind: 'image' | 'file') {
   ];
 }
 
+function insertAsset(asset: { name: string; url: string; kind: 'image' | 'file' }) {
+  if (asset.kind === 'image') {
+    form.body += `${form.body ? '\n\n' : ''}<img src="${asset.url}" alt="${asset.name}" style="max-width:100%;border-radius:16px;" />\n`;
+    return;
+  }
+  form.body += `${form.body ? '\n\n' : ''}<p><a href="${asset.url}" target="_blank" rel="noreferrer noopener">${asset.name}</a></p>\n`;
+}
+
+function removeAsset(url: string) {
+  uploadedAssets.value = uploadedAssets.value.filter((asset) => asset.url !== url);
+}
+
 function validateForm() {
   if (!form.title.trim()) {
     ElMessage.warning('请输入标题');
@@ -364,6 +378,8 @@ onMounted(async () => {
 .file-input { color:#475569; }
 .asset-strip { display:flex; gap:8px; flex-wrap:wrap; padding:0 16px 14px; }
 .asset-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#eef6ff; color:#166534; font-size:12px; }
+.asset-btn { border:none; border-radius:999px; padding:2px 8px; background:#dbeafe; color:#1d4ed8; cursor:pointer; font-size:12px; }
+.asset-btn.danger { background:#fee2e2; color:#b91c1c; }
 .editor-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,.9fr); gap:0; }
 .editor-pane, .preview-pane { padding:18px; }
 .preview-pane { border-left:1px solid rgba(148,163,184,.22); background:rgba(248,250,252,.65); }

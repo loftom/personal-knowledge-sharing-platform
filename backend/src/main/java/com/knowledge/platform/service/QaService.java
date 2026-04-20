@@ -14,6 +14,7 @@ import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.QaAnswerMapper;
 import com.knowledge.platform.domain.mapper.QaQuestionMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
+import com.knowledge.platform.realtime.RealtimePushService;
 import com.knowledge.platform.security.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class QaService {
     private final BehaviorService behaviorService;
     private final NotificationService notificationService;
     private final PointService pointService;
+    private final RealtimePushService realtimePushService;
 
     public QaService(QaQuestionMapper qaQuestionMapper,
                      QaAnswerMapper qaAnswerMapper,
@@ -44,7 +46,8 @@ public class QaService {
                      UserMapper userMapper,
                      BehaviorService behaviorService,
                      NotificationService notificationService,
-                     PointService pointService) {
+                     PointService pointService,
+                     RealtimePushService realtimePushService) {
         this.qaQuestionMapper = qaQuestionMapper;
         this.qaAnswerMapper = qaAnswerMapper;
         this.contentMapper = contentMapper;
@@ -53,6 +56,7 @@ public class QaService {
         this.behaviorService = behaviorService;
         this.notificationService = notificationService;
         this.pointService = pointService;
+        this.realtimePushService = realtimePushService;
     }
 
     public void initQuestionIfNeeded(Content content) {
@@ -74,7 +78,7 @@ public class QaService {
 
     @Transactional
     public Long addAnswer(Long questionId, Phase2Dtos.CreateAnswerRequest request) {
-        assertQuestion(questionId, UserContext.getUserId(), true);
+        Content question = assertQuestion(questionId, UserContext.getUserId(), true);
         QaAnswer answer = new QaAnswer();
         answer.setQuestionId(questionId);
         answer.setUserId(UserContext.getUserId());
@@ -95,6 +99,11 @@ public class QaService {
             meta.setUpdatedAt(LocalDateTime.now());
             qaQuestionMapper.updateById(meta);
         }
+
+        realtimePushService.pushAfterCommit(buildUserTargets(question.getAuthorId(), answer.getUserId()), "qa-answer", Map.of(
+                "questionId", questionId,
+                "answerId", answer.getId()
+        ));
         return answer.getId();
     }
 
@@ -126,6 +135,11 @@ public class QaService {
 
         notificationService.notifyBestAnswer(answer, question);
         pointService.rewardBestAnswer(answer.getUserId(), answer.getId());
+        realtimePushService.pushAfterCommit(buildUserTargets(question.getAuthorId(), answer.getUserId()), "qa-state-changed", Map.of(
+            "questionId", questionId,
+            "status", "RESOLVED",
+            "bestAnswerId", answerId
+        ));
     }
 
     public void reopen(Long questionId) {
@@ -142,7 +156,19 @@ public class QaService {
         qaAnswerMapper.update(new LambdaUpdateWrapper<QaAnswer>()
                 .set(QaAnswer::getIsBest, 0)
                 .eq(QaAnswer::getQuestionId, questionId));
+        realtimePushService.pushAfterCommit(buildUserTargets(question.getAuthorId(), UserContext.getUserId()), "qa-state-changed", Map.of(
+            "questionId", questionId,
+            "status", "PENDING",
+            "bestAnswerId", 0
+        ));
     }
+
+        private List<Long> buildUserTargets(Long... userIds) {
+        return java.util.Arrays.stream(userIds)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        }
 
     public Phase2Dtos.QuestionStateResponse state(Long questionId) {
         assertQuestion(questionId, UserContext.getUserId(), false);
