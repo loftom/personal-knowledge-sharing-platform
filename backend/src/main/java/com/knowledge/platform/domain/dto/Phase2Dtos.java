@@ -91,6 +91,8 @@ public class Phase2Dtos {
         private Long authorId;
         private String authorName;
         private Double score;
+        private String reasonText;
+        private List<String> reasonTags;
         private Long viewCount;
         private Long likeCount;
         private Long favoriteCount;

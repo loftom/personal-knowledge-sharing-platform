@@ -30,10 +30,17 @@
             </div>
             <h3>{{ item.title }}</h3>
             <p>{{ item.summary || '系统已将该内容纳入推荐结果，进入详情页可查看完整正文。' }}</p>
-            <div class="reason-line">推荐依据：兴趣标签匹配、内容热度、发布时间与近期互动表现</div>
+            <div class="reason-line">推荐依据：{{ item.reasonText || '兴趣标签匹配、内容热度、发布时间与近期互动表现' }}</div>
+            <div v-if="(item.reasonTags || []).length > 0" class="reason-tags">
+              <el-tag v-for="tag in item.reasonTags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+            </div>
           </div>
 
           <div class="recommend-side">
+            <div class="stat-card score-card">
+              <span>推荐分</span>
+              <strong>{{ formatScore(item.score) }}</strong>
+            </div>
             <div class="stat-card">
               <span>阅读</span>
               <strong>{{ item.viewCount || 0 }}</strong>
@@ -69,6 +76,11 @@ const loading = ref(false);
 
 function openDetail(row: any) {
   router.push(row.type === 'QUESTION' ? `/qa/${row.id}` : `/content/${row.id}`);
+}
+
+function formatScore(score: number | string | undefined) {
+  const value = Number(score || 0);
+  return Number.isFinite(value) ? value.toFixed(2) : '0.00';
 }
 
 async function load() {
@@ -198,9 +210,16 @@ onMounted(load);
   font-weight: 600;
 }
 
+.reason-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
 .recommend-side {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-self: start;
 }
@@ -210,6 +229,11 @@ onMounted(load);
   text-align: center;
   border-radius: 16px;
   background: #f0fdf4;
+}
+
+.score-card {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.12), rgba(15, 118, 110, 0.12));
 }
 
 .stat-card span {

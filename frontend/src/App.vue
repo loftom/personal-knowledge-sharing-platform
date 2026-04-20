@@ -45,6 +45,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from './api';
 import { clearUserAuth, getUserAuth, setUserAuth } from './utils/auth';
+import { startRealtime, stopRealtime, type RealtimeEvent } from './utils/realtime';
 
 const router = useRouter();
 const route = useRoute();
@@ -52,6 +53,7 @@ const token = ref(getUserAuth().token);
 const nickname = ref(getUserAuth().nickname);
 const username = ref(getUserAuth().username);
 const messageUnreadCount = ref(0);
+let unreadSyncTimer: ReturnType<typeof window.setInterval> | undefined;
 
 const isLoggedIn = computed(() => !!token.value);
 const isAdminLayout = computed(() => route.path.startsWith('/admin'));
@@ -70,8 +72,12 @@ async function syncAuthState() {
   username.value = auth.username;
 
   if (!token.value) {
+    stopRealtime();
+    messageUnreadCount.value = 0;
     return;
   }
+
+  startRealtime(handleRealtimeEvent);
 
   try {
     const res = await api.get('/profile/me/space');
@@ -90,11 +96,31 @@ async function syncAuthState() {
     // Ignore profile refresh errors and keep cached auth state.
   }
 
+  await syncUnreadCount();
+}
+
+async function syncUnreadCount() {
+  const auth = getUserAuth();
+  if (!auth.token) {
+    messageUnreadCount.value = 0;
+    return;
+  }
+
   try {
     const unreadRes = await api.get('/message/unread-count');
     messageUnreadCount.value = Number(unreadRes.data.data?.unreadCount || 0);
   } catch {
     messageUnreadCount.value = 0;
+  }
+}
+
+function handleRealtimeEvent(event: RealtimeEvent) {
+  void syncUnreadCount();
+  if (event.type === 'private-message' || event.type === 'notification-read') {
+    window.dispatchEvent(new Event('private-message-change'));
+  }
+  if (event.type === 'notification' || event.type === 'notification-read') {
+    window.dispatchEvent(new Event('notification-change'));
   }
 }
 
@@ -116,13 +142,27 @@ function switchAccount() {
 
 onMounted(() => {
   window.addEventListener('auth-change', syncAuthState);
-  window.addEventListener('private-message-change', syncAuthState);
+  window.addEventListener('private-message-change', syncUnreadCount);
+  window.addEventListener('notification-change', syncUnreadCount);
+  window.addEventListener('focus', syncUnreadCount);
+  document.addEventListener('visibilitychange', syncUnreadCount);
+  unreadSyncTimer = window.setInterval(() => {
+    void syncUnreadCount();
+  }, 20000);
   void syncAuthState();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('auth-change', syncAuthState);
-  window.removeEventListener('private-message-change', syncAuthState);
+  window.removeEventListener('private-message-change', syncUnreadCount);
+  window.removeEventListener('notification-change', syncUnreadCount);
+  window.removeEventListener('focus', syncUnreadCount);
+  document.removeEventListener('visibilitychange', syncUnreadCount);
+  if (unreadSyncTimer) {
+    clearInterval(unreadSyncTimer);
+    unreadSyncTimer = undefined;
+  }
+  stopRealtime();
 });
 </script>
 

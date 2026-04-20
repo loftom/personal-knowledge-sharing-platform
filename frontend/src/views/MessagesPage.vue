@@ -32,6 +32,7 @@
         <div v-if="activeConversation" class="chat-head">
           <h2>{{ activeConversation.displayName }}</h2>
           <p>{{ activeConversation.username }}</p>
+          <small>最近同步：{{ lastSyncedAt || '等待同步' }}</small>
         </div>
 
         <div v-if="activeConversation" class="message-list" v-loading="loadingMessages">
@@ -75,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
@@ -91,6 +92,8 @@ const loadingMessages = ref(false);
 const sending = ref(false);
 const draft = ref('');
 const activeUserId = ref<number | null>(null);
+const lastSyncedAt = ref('');
+let refreshTimer: ReturnType<typeof window.setInterval> | undefined;
 
 const activeConversation = computed(() => conversations.value.find((item) => item.userId === activeUserId.value) || null);
 
@@ -146,6 +149,14 @@ async function loadConversations() {
   } finally {
     loadingConversations.value = false;
   }
+}
+
+async function refreshConversationState() {
+  await loadConversations();
+  if (activeUserId.value) {
+    await loadMessages();
+  }
+  lastSyncedAt.value = dayjs().format('HH:mm:ss');
 }
 
 async function loadMessages() {
@@ -205,8 +216,23 @@ watch(
 );
 
 onMounted(async () => {
-  await loadConversations();
-  await loadMessages();
+  await refreshConversationState();
+  window.addEventListener('private-message-change', refreshConversationState);
+  window.addEventListener('focus', refreshConversationState);
+  document.addEventListener('visibilitychange', refreshConversationState);
+  refreshTimer = window.setInterval(() => {
+    void refreshConversationState();
+  }, 15000);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('private-message-change', refreshConversationState);
+  window.removeEventListener('focus', refreshConversationState);
+  document.removeEventListener('visibilitychange', refreshConversationState);
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = undefined;
+  }
 });
 </script>
 
@@ -227,6 +253,7 @@ onMounted(async () => {
 .conversation-item p { margin: 10px 0 12px; color: #475569; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .chat-panel { display: grid; grid-template-rows: auto minmax(0,1fr) auto; overflow: hidden; }
 .chat-head { padding: 24px 26px 18px; border-bottom: 1px solid #eef2f7; }
+.chat-head small { display:block; margin-top:6px; color:#94a3b8; }
 .message-list, .chat-placeholder { padding: 22px 26px; overflow: auto; display: grid; gap: 14px; align-content: start; }
 .message-bubble { max-width: min(76%, 680px); padding: 14px 16px 12px; border-radius: 20px; display: grid; gap: 8px; }
 .message-bubble.peer { background: #f6f8fc; border: 1px solid #e8edf5; }

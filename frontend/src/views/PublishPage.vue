@@ -85,9 +85,16 @@
                 <el-button size="small" plain @click="insertBlock('code')">插入代码块</el-button>
               </div>
               <div class="tool-group">
-                <span class="tool-tip">支持上传图片，也可使用 Markdown 风格输入标题、引用和代码块</span>
+                <span class="tool-tip">支持上传图片、附件，也可使用 Markdown 风格输入标题、引用和代码块</span>
                 <input class="file-input" type="file" accept="image/*" @change="onImageSelected" />
+                <input class="file-input" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,image/*" @change="onAttachmentSelected" />
               </div>
+            </div>
+
+            <div v-if="uploadedAssets.length > 0" class="asset-strip">
+              <span v-for="asset in uploadedAssets" :key="asset.url" class="asset-chip">
+                {{ asset.kind === 'image' ? '图片' : '附件' }}：{{ asset.name }}
+              </span>
             </div>
 
             <div class="editor-grid">
@@ -146,6 +153,7 @@ const categories = ref<any[]>([]);
 const tags = ref<any[]>([]);
 const submittingDraft = ref(false);
 const submittingPublish = ref(false);
+const uploadedAssets = ref<Array<{ name: string; url: string; kind: 'image' | 'file' }>>([]);
 
 const form = reactive({
   type: 'ARTICLE',
@@ -229,20 +237,50 @@ function insertBlock(type: 'h2' | 'quote' | 'code') {
 async function onImageSelected(e: Event) {
   const input = e.target as HTMLInputElement;
   if (!input.files || input.files.length === 0) return;
-  const file = input.files[0];
-  const fd = new FormData();
-  fd.append('file', file);
   try {
-    const res = await api.post('/uploads', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-    const url = res.data?.data;
-    if (!url) throw new Error('missing upload url');
-    form.body += `${form.body ? '\n\n' : ''}<img src="${url}" alt="upload" style="max-width:100%;border-radius:16px;" />\n`;
+    await uploadAsset(input.files[0], 'image');
     ElMessage.success('图片上传成功');
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.message || err.message || '图片上传失败');
   } finally {
     input.value = '';
   }
+}
+
+async function onAttachmentSelected(e: Event) {
+  const input = e.target as HTMLInputElement;
+  if (!input.files || input.files.length === 0) return;
+  try {
+    await uploadAsset(input.files[0], 'file');
+    ElMessage.success('附件上传成功');
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message || err.message || '附件上传失败');
+  } finally {
+    input.value = '';
+  }
+}
+
+async function uploadAsset(file: File, kind: 'image' | 'file') {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await api.post('/uploads', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  const url = res.data?.data;
+  if (!url) throw new Error('missing upload url');
+
+  if (kind === 'image') {
+    form.body += `${form.body ? '\n\n' : ''}<img src="${url}" alt="${file.name}" style="max-width:100%;border-radius:16px;" />\n`;
+  } else {
+    form.body += `${form.body ? '\n\n' : ''}<p><a href="${url}" target="_blank" rel="noreferrer noopener">${file.name}</a></p>\n`;
+  }
+
+  uploadedAssets.value = [
+    ...uploadedAssets.value,
+    {
+      name: file.name,
+      url,
+      kind
+    }
+  ];
 }
 
 function validateForm() {
@@ -324,6 +362,8 @@ onMounted(async () => {
 .tool-group { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .tool-tip { color:#64748b; font-size:13px; }
 .file-input { color:#475569; }
+.asset-strip { display:flex; gap:8px; flex-wrap:wrap; padding:0 16px 14px; }
+.asset-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#eef6ff; color:#166534; font-size:12px; }
 .editor-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,.9fr); gap:0; }
 .editor-pane, .preview-pane { padding:18px; }
 .preview-pane { border-left:1px solid rgba(148,163,184,.22); background:rgba(248,250,252,.65); }

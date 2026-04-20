@@ -12,12 +12,14 @@ import com.knowledge.platform.domain.entity.Notification;
 import com.knowledge.platform.domain.mapper.CommentMapper;
 import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.NotificationMapper;
+import com.knowledge.platform.realtime.RealtimePushService;
 import com.knowledge.platform.security.UserContext;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,13 +28,16 @@ public class NotificationService {
     private final NotificationMapper notificationMapper;
     private final FollowRelationMapper followRelationMapper;
     private final CommentMapper commentMapper;
+    private final RealtimePushService realtimePushService;
 
     public NotificationService(NotificationMapper notificationMapper,
                                FollowRelationMapper followRelationMapper,
-                               CommentMapper commentMapper) {
+                               CommentMapper commentMapper,
+                               RealtimePushService realtimePushService) {
         this.notificationMapper = notificationMapper;
         this.followRelationMapper = followRelationMapper;
         this.commentMapper = commentMapper;
+        this.realtimePushService = realtimePushService;
     }
 
     public void notifyBestAnswer(QaAnswer answer, Content content) {
@@ -46,6 +51,10 @@ public class NotificationService {
         n.setIsRead(0);
         n.setCreatedAt(LocalDateTime.now());
         notificationMapper.insert(n);
+        realtimePushService.pushAfterCommit(n.getUserId(), "notification", Map.of(
+            "notificationType", n.getType(),
+            "relatedId", n.getRelatedId()
+        ));
     }
 
     public void notifyFollowersNewContent(Content content) {
@@ -65,6 +74,10 @@ public class NotificationService {
             n.setIsRead(0);
             n.setCreatedAt(LocalDateTime.now());
             notificationMapper.insert(n);
+            realtimePushService.pushAfterCommit(n.getUserId(), "notification", Map.of(
+                    "notificationType", n.getType(),
+                    "relatedId", n.getRelatedId()
+            ));
         }
     }
 
@@ -85,6 +98,10 @@ public class NotificationService {
             n.setIsRead(0);
             n.setCreatedAt(LocalDateTime.now());
             notificationMapper.insert(n);
+            realtimePushService.pushAfterCommit(n.getUserId(), "notification", Map.of(
+                    "notificationType", n.getType(),
+                    "relatedId", n.getRelatedId()
+            ));
         }
 
         if (comment.getParentId() != null && comment.getParentId() > 0) {
@@ -99,6 +116,10 @@ public class NotificationService {
                 reply.setIsRead(0);
                 reply.setCreatedAt(LocalDateTime.now());
                 notificationMapper.insert(reply);
+                realtimePushService.pushAfterCommit(reply.getUserId(), "notification", Map.of(
+                        "notificationType", reply.getType(),
+                        "relatedId", reply.getRelatedId()
+                ));
             }
         }
     }
@@ -131,6 +152,7 @@ public class NotificationService {
         n.setIsRead(1);
         n.setReadAt(LocalDateTime.now());
         notificationMapper.updateById(n);
+        realtimePushService.pushAfterCommit(userId, "notification-read", Map.of("notificationId", id));
     }
 
     public void markAllRead() {
@@ -140,6 +162,7 @@ public class NotificationService {
                 .set(Notification::getReadAt, LocalDateTime.now())
                 .eq(Notification::getUserId, userId)
                 .eq(Notification::getIsRead, 0));
+        realtimePushService.pushAfterCommit(userId, "notification-read", Map.of("notificationId", 0));
     }
 
     private Phase2Dtos.NotificationItem toItem(Notification n) {

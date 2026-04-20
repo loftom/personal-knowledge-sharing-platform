@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
@@ -116,7 +116,14 @@ function openNotice(item: any) {
   router.push(`/content/${item.relatedId}`);
 }
 
-onMounted(load);
+onMounted(() => {
+  window.addEventListener('notification-change', load);
+  void load();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('notification-change', load);
+});
 </script>
 
 <style scoped>

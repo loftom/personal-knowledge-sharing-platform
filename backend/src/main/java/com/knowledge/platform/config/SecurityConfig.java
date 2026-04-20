@@ -25,7 +25,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/public/**", "/uploads/**", "/error").permitAll()
+                    .requestMatchers("/api/auth/**", "/api/public/**", "/uploads/**", "/ws/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/interaction/comment/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/qa/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

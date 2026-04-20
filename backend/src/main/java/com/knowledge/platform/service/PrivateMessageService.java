@@ -10,6 +10,7 @@ import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.NotificationMapper;
 import com.knowledge.platform.domain.mapper.PrivateMessageMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
+import com.knowledge.platform.realtime.RealtimePushService;
 import com.knowledge.platform.security.UserContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,13 +30,16 @@ public class PrivateMessageService {
     private final PrivateMessageMapper privateMessageMapper;
     private final UserMapper userMapper;
     private final NotificationMapper notificationMapper;
+    private final RealtimePushService realtimePushService;
 
     public PrivateMessageService(PrivateMessageMapper privateMessageMapper,
                                  UserMapper userMapper,
-                                 NotificationMapper notificationMapper) {
+                                 NotificationMapper notificationMapper,
+                                 RealtimePushService realtimePushService) {
         this.privateMessageMapper = privateMessageMapper;
         this.userMapper = userMapper;
         this.notificationMapper = notificationMapper;
+        this.realtimePushService = realtimePushService;
     }
 
     public List<Phase2Dtos.PrivateConversationItem> conversations() {
@@ -112,6 +116,16 @@ public class PrivateMessageService {
         notification.setIsRead(0);
         notification.setCreatedAt(LocalDateTime.now());
         notificationMapper.insert(notification);
+
+        realtimePushService.pushAfterCommit(List.of(currentUserId, receiver.getId()), "private-message", Map.of(
+            "senderUserId", currentUserId,
+            "receiverUserId", receiver.getId(),
+            "messageId", row.getId()
+        ));
+        realtimePushService.pushAfterCommit(receiver.getId(), "notification", Map.of(
+            "notificationType", "PRIVATE_MESSAGE",
+            "relatedId", sender.getId()
+        ));
 
         Map<Long, User> userMap = Map.of(
                 currentUserId, sender,

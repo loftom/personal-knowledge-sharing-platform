@@ -29,6 +29,29 @@
           </div>
         </div>
 
+        <div class="insight-grid">
+          <div class="insight-card">
+            <span>7日总阅读</span>
+            <strong>{{ trendSummary.totalViews }}</strong>
+            <small>平均每天 {{ trendSummary.avgViews }}</small>
+          </div>
+          <div class="insight-card">
+            <span>峰值发布日</span>
+            <strong>{{ trendSummary.peakDayLabel }}</strong>
+            <small>{{ trendSummary.peakDayPublished }} 篇内容 / {{ trendSummary.peakDayViews }} 阅读</small>
+          </div>
+          <div class="insight-card">
+            <span>近期互动增量</span>
+            <strong>{{ trendSummary.totalPoints }}</strong>
+            <small>积分流水合计</small>
+          </div>
+          <div class="insight-card">
+            <span>最新趋势</span>
+            <strong>{{ trendSummary.latestDeltaLabel }}</strong>
+            <small>较前一日 {{ trendSummary.latestDeltaCompare }}</small>
+          </div>
+        </div>
+
         <div class="summary-grid">
           <div class="summary-card">
             <h3>核心指标</h3>
@@ -106,6 +129,26 @@ const maxLikes = computed(() => Math.max(...trends.value.map((item: any) => item
 const maxFavorites = computed(() => Math.max(...trends.value.map((item: any) => item.favorites || 0), 1));
 const maxPoints = computed(() => Math.max(...trends.value.map((item: any) => item.pointDelta || 0), 1));
 
+const trendSummary = computed(() => {
+  const items = trends.value;
+  const totalViews = items.reduce((sum: number, item: any) => sum + Number(item.views || 0), 0);
+  const totalPoints = items.reduce((sum: number, item: any) => sum + Number(item.pointDelta || 0), 0);
+  const peakDay = [...items].sort((a: any, b: any) => Number(b.publishedCount || 0) - Number(a.publishedCount || 0))[0] || null;
+  const latest = items[items.length - 1] || null;
+  const previous = items[items.length - 2] || null;
+  const latestDeltaCompare = latest && previous ? `${Number(latest.views || 0) - Number(previous.views || 0)} 阅读` : '暂无对比';
+  return {
+    totalViews,
+    avgViews: items.length ? Math.round(totalViews / items.length) : 0,
+    peakDayLabel: peakDay ? peakDay.dateLabel.slice(5) : '-',
+    peakDayPublished: peakDay ? peakDay.publishedCount || 0 : 0,
+    peakDayViews: peakDay ? peakDay.views || 0 : 0,
+    totalPoints,
+    latestDeltaLabel: latest ? `${latest.dateLabel.slice(5)} · ${Number(latest.views || 0)} 阅读` : '-',
+    latestDeltaCompare
+  };
+});
+
 function calcHeight(value: number, max: number) {
   if (!value || !max) return 10;
   return Math.max(10, Math.round((value / max) * 120));
@@ -139,8 +182,13 @@ onMounted(load);
 .report-body { display:grid; gap:22px; }
 .stat-grid, .summary-grid { display:grid; gap:16px; }
 .stat-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.insight-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
 .summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .stat-box, .summary-card, .trend-section { padding:18px; border-radius:20px; background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%); box-shadow:inset 0 0 0 1px rgba(148,163,184,.14); }
+.insight-card { padding:18px; border-radius:20px; background:linear-gradient(135deg, rgba(22,119,255,.10), rgba(15,118,110,.08)); box-shadow:inset 0 0 0 1px rgba(148,163,184,.14); }
+.insight-card span { color:#64748b; font-size:13px; }
+.insight-card strong { display:block; margin-top:10px; color:#0f172a; font-size:24px; }
+.insight-card small { display:block; margin-top:8px; color:#64748b; }
 .stat-box span { color:#64748b; font-size:13px; }
 .stat-box strong { display:block; margin-top:10px; color:#0f172a; font-size:28px; }
 .summary-card h3, .trend-section h3 { margin:0 0 12px; }
@@ -163,7 +211,7 @@ onMounted(load);
 .point-log-line { display:flex; gap:10px; align-items:center; }
 .gain { color:#16a34a; } .loss { color:#dc2626; }
 @media (max-width: 920px) {
-  .stat-grid, .summary-grid { grid-template-columns:1fr; }
+  .stat-grid, .summary-grid, .insight-grid { grid-template-columns:1fr; }
   .trend-chart { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .trend-head { flex-direction:column; align-items:flex-start; }
 }
