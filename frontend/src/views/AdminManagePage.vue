@@ -9,6 +9,31 @@
       <el-button @click="reloadAll">刷新全部</el-button>
     </div>
 
+    <div class="overview-grid">
+      <div class="overview-card">
+        <span>用户总量</span>
+        <strong>{{ userSummary.total }}</strong>
+        <small>启用 {{ userSummary.active }} / 停用 {{ userSummary.disabled }}</small>
+      </div>
+      <div class="overview-card">
+        <span>内容总量</span>
+        <strong>{{ contentSummary.total }}</strong>
+        <small>已发布 {{ contentSummary.published }} / 待审核 {{ contentSummary.pending }}</small>
+      </div>
+      <div class="overview-card large">
+        <span>内容状态占比图</span>
+        <div class="status-bars">
+          <div v-for="item in statusBars" :key="item.label" class="status-row">
+            <label>{{ item.label }}</label>
+            <div class="bar-track">
+              <i class="bar-fill" :style="{ width: `${item.percent}%`, background: item.color }"></i>
+            </div>
+            <strong>{{ item.value }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <el-tabs v-model="activeTab" class="panel-tabs">
       <el-tab-pane label="用户管理" name="users">
         <el-card class="panel-card" shadow="never">
@@ -20,6 +45,7 @@
               <el-option label="停用" :value="0" />
             </el-select>
             <el-button type="primary" plain @click="loadUsers">查询</el-button>
+            <el-button plain @click="exportUsersCsv">导出 CSV</el-button>
           </div>
 
           <el-table :data="users" :loading="loadingUsers">
@@ -82,10 +108,20 @@
               <el-option label="教程" value="TUTORIAL" />
               <el-option label="问答" value="QUESTION" />
             </el-select>
+            <el-select v-model="batchStatus" style="width: 180px">
+              <el-option label="批量状态变更" value="" />
+              <el-option label="批量改为待审核" value="PENDING_REVIEW" />
+              <el-option label="批量改为已发布" value="PUBLISHED" />
+              <el-option label="批量改为已驳回" value="REJECTED" />
+              <el-option label="批量改为已下架" value="OFFLINE" />
+            </el-select>
             <el-button type="primary" plain @click="loadContents">查询</el-button>
+            <el-button type="warning" plain @click="batchUpdateContents">批量应用</el-button>
+            <el-button plain @click="exportContentsCsv">导出 CSV</el-button>
           </div>
 
-          <el-table :data="contents" :loading="loadingContents">
+          <el-table :data="contents" :loading="loadingContents" @selection-change="onContentSelectionChange">
+            <el-table-column type="selection" width="42" />
             <el-table-column prop="title" label="标题" min-width="240" />
             <el-table-column prop="authorName" label="作者" min-width="120" />
             <el-table-column prop="type" label="类型" width="110" />
@@ -122,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import api from '../api';
 
@@ -131,6 +167,36 @@ const users = ref<any[]>([]);
 const contents = ref<any[]>([]);
 const loadingUsers = ref(false);
 const loadingContents = ref(false);
+const selectedContents = ref<any[]>([]);
+const batchStatus = ref('');
+
+const userSummary = computed(() => ({
+  total: users.value.length,
+  active: users.value.filter((item) => Number(item.status) === 1).length,
+  disabled: users.value.filter((item) => Number(item.status) !== 1).length
+}));
+
+const contentSummary = computed(() => ({
+  total: contents.value.length,
+  pending: contents.value.filter((item) => item.status === 'PENDING_REVIEW').length,
+  published: contents.value.filter((item) => item.status === 'PUBLISHED').length,
+  rejected: contents.value.filter((item) => item.status === 'REJECTED').length,
+  offline: contents.value.filter((item) => item.status === 'OFFLINE').length
+}));
+
+const statusBars = computed(() => {
+  const rows = [
+    { label: '待审核', value: contentSummary.value.pending, color: 'linear-gradient(90deg,#f59e0b,#fb7185)' },
+    { label: '已发布', value: contentSummary.value.published, color: 'linear-gradient(90deg,#10b981,#22c55e)' },
+    { label: '已驳回', value: contentSummary.value.rejected, color: 'linear-gradient(90deg,#8b5cf6,#6366f1)' },
+    { label: '已下架', value: contentSummary.value.offline, color: 'linear-gradient(90deg,#ef4444,#dc2626)' }
+  ];
+  const max = Math.max(...rows.map((item) => item.value), 1);
+  return rows.map((item) => ({
+    ...item,
+    percent: Math.max(Math.round((item.value / max) * 100), item.value > 0 ? 10 : 0)
+  }));
+});
 
 const userQuery = reactive({
   keyword: '',
@@ -229,6 +295,79 @@ async function updateContentStatus(row: any) {
   }
 }
 
+function onContentSelectionChange(rows: any[]) {
+  selectedContents.value = rows;
+}
+
+async function batchUpdateContents() {
+  if (!batchStatus.value) {
+    ElMessage.info('请选择批量目标状态');
+    return;
+  }
+  if (!selectedContents.value.length) {
+    ElMessage.warning('请先勾选要批量处理的内容');
+    return;
+  }
+  try {
+    await Promise.all(selectedContents.value.map((row) => api.post(`/admin/manage/contents/${row.id}/status`, {
+      status: batchStatus.value,
+      reason: `批量更新为 ${batchStatus.value}`
+    })));
+    ElMessage.success(`已批量更新 ${selectedContents.value.length} 条内容`);
+    selectedContents.value = [];
+    await loadContents();
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e.message || '批量更新失败');
+  }
+}
+
+function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number>>) {
+  const escapeCell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const content = [header.map(escapeCell).join(','), ...rows.map((row) => row.map(escapeCell).join(','))].join('\n');
+  const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function exportUsersCsv() {
+  downloadCsv(
+    `users-${Date.now()}.csv`,
+    ['ID', '用户名', '昵称', '角色', '状态', '内容量', '已发布量', '注册时间'],
+    users.value.map((user) => [
+      user.id,
+      user.username || '',
+      user.nickname || '',
+      user.role || '',
+      Number(user.status) === 1 ? '启用' : '停用',
+      user.contentCount || 0,
+      user.publishedContentCount || 0,
+      user.createdAt || ''
+    ])
+  );
+}
+
+function exportContentsCsv() {
+  downloadCsv(
+    `contents-${Date.now()}.csv`,
+    ['ID', '标题', '类型', '状态', '可见性', '作者', '阅读', '点赞', '收藏', '创建时间'],
+    contents.value.map((content) => [
+      content.id,
+      content.title || '',
+      content.type || '',
+      statusLabel(content.status),
+      content.visibility || '',
+      content.authorName || '',
+      content.viewCount || 0,
+      content.likeCount || 0,
+      content.favoriteCount || 0,
+      content.createdAt || ''
+    ])
+  );
+}
+
 async function reloadAll() {
   await Promise.all([loadUsers(), loadContents()]);
 }
@@ -252,6 +391,18 @@ onMounted(async () => {
 .page-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
 .page-head h2 { margin: 8px 0 6px; font-size: 30px; }
 .page-head p { margin: 0; color: #64748b; line-height: 1.75; }
+.overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.overview-card { padding:16px; border-radius:20px; background:linear-gradient(135deg,#ffffff,#f8fbff); box-shadow:0 10px 25px rgba(15,23,42,.07); }
+.overview-card.large { grid-column: span 1; }
+.overview-card span { color:#64748b; font-size:12px; }
+.overview-card strong { display:block; margin-top:8px; color:#0f172a; font-size:30px; }
+.overview-card small { display:block; margin-top:6px; color:#64748b; }
+.status-bars { display:grid; gap:8px; margin-top:8px; }
+.status-row { display:grid; grid-template-columns:70px 1fr 36px; align-items:center; gap:8px; }
+.status-row label { color:#64748b; font-size:12px; }
+.bar-track { height:8px; border-radius:999px; background:#e2e8f0; overflow:hidden; }
+.bar-fill { display:block; height:100%; border-radius:inherit; }
+.status-row strong { color:#0f172a; font-size:12px; text-align:right; }
 .section-tag { display: inline-block; padding: 6px 12px; border-radius: 999px; color: #0f766e; background: rgba(16, 185, 129, 0.12); font-size: 12px; font-weight: 700; }
 .panel-tabs :deep(.el-tabs__header) { margin: 0; }
 .panel-card { border: none; border-radius: 24px; background: rgba(255,255,255,.92); box-shadow: 0 18px 45px rgba(15,23,42,.08); }
@@ -259,6 +410,7 @@ onMounted(async () => {
 .toolbar-row.wrap { flex-wrap: wrap; }
 .muted-text { color: #94a3b8; font-size: 12px; }
 @media (max-width: 860px) {
+  .overview-grid { grid-template-columns:1fr; }
   .toolbar-row { flex-wrap: wrap; }
 }
 </style>

@@ -34,14 +34,14 @@
             <div class="section-head">
               <div>
                 <h2>评论区</h2>
-                <p>围绕文章观点展开交流，持续沉淀更完整的讨论内容。</p>
+                <p>欢迎围绕文章内容继续补充经验、交流实现思路或提出改进建议。</p>
               </div>
               <span class="comment-count">{{ comments.length }} 条评论</span>
             </div>
 
             <el-alert
               v-if="!isLoggedIn"
-              title="当前未登录，可浏览评论内容；登录后可参与评论、回复、点赞与收藏。"
+              title="登录后可以发表评论和回复其他用户。"
               type="info"
               :closable="false"
               class="login-alert"
@@ -53,12 +53,12 @@
                 type="textarea"
                 :rows="5"
                 resize="none"
-                placeholder="写下你的观点、补充信息或使用感受"
+                placeholder="写下你的看法、补充说明或使用心得。"
                 :disabled="!isLoggedIn"
               />
               <div class="editor-footer">
-                <span>文明交流，鼓励围绕主题展开高质量讨论。</span>
-                <el-button type="primary" :disabled="!isLoggedIn" @click="submitComment">发布评论</el-button>
+                <span>建议围绕文章主题交流，便于形成更高质量的知识讨论。</span>
+                <el-button type="primary" :disabled="!isLoggedIn" @click="submitComment">发表评论</el-button>
               </div>
             </div>
 
@@ -88,7 +88,7 @@
                         type="textarea"
                         :rows="3"
                         resize="none"
-                        placeholder="继续补充你的回复内容"
+                        placeholder="继续补充回复内容"
                         :disabled="!isLoggedIn"
                       />
                       <div class="reply-actions">
@@ -114,7 +114,7 @@
             </div>
 
             <div v-else class="empty-wrap">
-              <el-empty description="当前还没有评论，欢迎发表第一条交流内容" />
+              <el-empty description="暂时还没有评论，欢迎成为第一个留言的人。" />
             </div>
           </section>
         </main>
@@ -149,12 +149,32 @@
             </div>
           </section>
 
+          <section v-if="attachments.length" class="attachment-list-card">
+            <h3>附件列表</h3>
+            <div class="attachment-list">
+              <a
+                v-for="attachment in attachments"
+                :key="attachment.url"
+                class="attachment-list-item"
+                :href="attachment.url"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <div class="attachment-list-item__icon">附件</div>
+                <div class="attachment-list-item__body">
+                  <strong>{{ attachment.name }}</strong>
+                  <span>{{ attachment.meta || '点击下载或预览' }}</span>
+                </div>
+              </a>
+            </div>
+          </section>
+
           <section class="action-card">
             <h3>互动操作</h3>
-            <p>支持点赞与收藏，帮助优质内容持续获得更多关注。</p>
+            <p>你可以点赞、收藏这篇内容，也可以在评论区继续补充自己的理解。</p>
             <div class="action-buttons">
-              <el-button type="primary" @click="toggleLike">{{ liked ? '取消点赞' : '点赞支持' }}</el-button>
-              <el-button plain @click="toggleFavorite">{{ favorited ? '取消收藏' : '加入收藏' }}</el-button>
+              <el-button type="primary" @click="toggleLike">{{ liked ? '取消点赞' : '点赞内容' }}</el-button>
+              <el-button plain @click="toggleFavorite">{{ favorited ? '取消收藏' : '收藏内容' }}</el-button>
             </div>
           </section>
         </aside>
@@ -169,6 +189,12 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
 import api from '../api';
+
+type AttachmentItem = {
+  name: string;
+  url: string;
+  meta: string;
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -202,6 +228,29 @@ const authorInitial = computed(() => {
   return name ? name.slice(0, 1).toUpperCase() : 'U';
 });
 
+const attachments = computed<AttachmentItem[]>(() => {
+  const body = content.value?.body || '';
+  if (!body) return [];
+
+  const result: AttachmentItem[] = [];
+  const seen = new Set<string>();
+  const cardRegex = /<div class="attachment-card">[\s\S]*?<strong>([^<]+)<\/strong>[\s\S]*?<span>([^<]*)<\/span>[\s\S]*?<a href="([^"]+)"/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = cardRegex.exec(body)) !== null) {
+    const url = match[3];
+    if (seen.has(url)) continue;
+    seen.add(url);
+    result.push({
+      name: match[1] || url.split('/').pop() || '附件资源',
+      meta: match[2] || '点击下载或预览',
+      url
+    });
+  }
+
+  return result;
+});
+
 function formatTime(value?: string) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-';
 }
@@ -230,9 +279,7 @@ function goAuthorProfile() {
 }
 
 async function loadDetail(incrementView = true, silent = false) {
-  if (!silent) {
-    loading.value = true;
-  }
+  if (!silent) loading.value = true;
   try {
     const [contentRes, commentRes] = await Promise.all([
       api.get(`/public/content/${id}`, { params: { incrementView } }),
@@ -245,9 +292,7 @@ async function loadDetail(incrementView = true, silent = false) {
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '加载内容失败');
   } finally {
-    if (!silent) {
-      loading.value = false;
-    }
+    if (!silent) loading.value = false;
   }
 }
 
@@ -318,7 +363,7 @@ onMounted(loadDetail);
 
 .detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 24px;
   align-items: start;
 }
@@ -328,6 +373,7 @@ onMounted(loadDetail);
 .author-card,
 .stats-card,
 .action-card,
+.attachment-list-card,
 .skeleton-card {
   background: #fff;
   border: 1px solid #e8ecf3;
@@ -441,6 +487,12 @@ onMounted(loadDetail);
   line-height: 1.45;
 }
 
+.article-body :deep(h3) {
+  margin: 24px 0 12px;
+  color: #1e293b;
+  font-size: 20px;
+}
+
 .article-body :deep(blockquote) {
   margin: 20px 0;
   padding: 14px 18px;
@@ -463,6 +515,70 @@ onMounted(loadDetail);
   font-family: 'Consolas', 'Courier New', monospace;
 }
 
+.article-body :deep(.content-figure) {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+}
+
+.article-body :deep(.content-figure img) {
+  width: 100%;
+  border-radius: 20px;
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.12);
+}
+
+.article-body :deep(.content-figure figcaption) {
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.article-body :deep(.image-gallery) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.article-body :deep(.attachment-card) {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  margin: 24px 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+}
+
+.article-body :deep(.attachment-card__icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1677ff, #59a0ff);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.article-body :deep(.attachment-card__body) {
+  display: grid;
+  gap: 4px;
+}
+
+.article-body :deep(.attachment-card__body strong) {
+  color: #0f172a;
+}
+
+.article-body :deep(.attachment-card__body span),
+.article-body :deep(.attachment-card__body a) {
+  color: #64748b;
+  font-size: 13px;
+}
+
 .aside-column {
   position: sticky;
   top: 20px;
@@ -472,7 +588,8 @@ onMounted(loadDetail);
 
 .author-card,
 .stats-card,
-.action-card {
+.action-card,
+.attachment-list-card {
   padding: 20px;
 }
 
@@ -506,7 +623,8 @@ onMounted(loadDetail);
 }
 
 .stats-card h3,
-.action-card h3 {
+.action-card h3,
+.attachment-list-card h3 {
   margin: 0 0 14px;
   color: #121212;
   font-size: 16px;
@@ -539,6 +657,49 @@ onMounted(loadDetail);
   color: #121212;
   font-size: 24px;
   font-weight: 700;
+}
+
+.attachment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.attachment-list-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fbff;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+  text-decoration: none;
+}
+
+.attachment-list-item__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1677ff, #59a0ff);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.attachment-list-item__body {
+  display: grid;
+  gap: 4px;
+}
+
+.attachment-list-item__body strong {
+  color: #0f172a;
+}
+
+.attachment-list-item__body span {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .action-card p {
@@ -732,6 +893,10 @@ onMounted(loadDetail);
   .editor-footer,
   .comment-head {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .article-body :deep(.image-gallery) {
     grid-template-columns: 1fr;
   }
 }
