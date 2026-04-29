@@ -6,8 +6,8 @@
           <div class="page-tag">{{ isEditMode ? '编辑内容' : '发布内容' }}</div>
           <h2>{{ isEditMode ? '编辑图文内容' : '创建图文内容' }}</h2>
           <p>
-            支持图文混排、代码块、附件、封面图、拖拽上传和图片排序。
-            这版编辑器重点补齐答辩展示最需要的内容组织能力，同时保留轻量、稳定的输入体验。
+            支持富文本排版、图文混排、代码高亮、附件、封面图、拖拽上传。
+            基于 Quill 所见即所得编辑器，提供专业级内容创作体验。
           </p>
         </div>
         <el-button plain @click="$router.push('/me')">返回我的内容</el-button>
@@ -110,13 +110,22 @@
           >
             <div class="editor-toolbar">
               <div class="tool-block">
-                <span class="tool-label">结构</span>
-                <el-button size="small" plain @click="insertBlock('heading')">二级标题</el-button>
-                <el-button size="small" plain @click="insertBlock('subheading')">三级标题</el-button>
-                <el-button size="small" plain @click="insertBlock('divider')">分隔线</el-button>
-                <el-button size="small" plain @click="insertBlock('quote')">引用</el-button>
-                <el-button size="small" plain @click="insertBlock('list')">项目列表</el-button>
-                <el-button size="small" plain @click="insertBlock('code')">代码块</el-button>
+                <span class="tool-label">格式</span>
+                <select class="ql-header" :value="undefined">
+                  <option value="2">二级标题</option>
+                  <option value="3">三级标题</option>
+                  <option selected>正文</option>
+                </select>
+                <button class="ql-bold" title="加粗"></button>
+                <button class="ql-italic" title="斜体"></button>
+                <button class="ql-underline" title="下划线"></button>
+                <button class="ql-blockquote" title="引用"></button>
+                <button class="ql-code" title="行内代码"></button>
+                <button class="ql-code-block" title="代码块"></button>
+                <button class="ql-list" value="ordered" title="有序列表"></button>
+                <button class="ql-list" value="bullet" title="无序列表"></button>
+                <button class="ql-link" title="插入链接"></button>
+                <button class="ql-clean" title="清除格式"></button>
               </div>
               <div class="tool-block">
                 <span class="tool-label">模板</span>
@@ -149,7 +158,7 @@
                   按当前顺序插入图组
                 </el-button>
               </div>
-              <span class="tool-tip">支持直接把图片或附件拖进编辑器区域上传，并在光标位置插入。</span>
+              <span class="tool-tip">支持直接把图片或附件拖入编辑器区域上传，并在光标位置插入。</span>
             </div>
 
             <div v-if="uploadedAssets.length > 0" class="asset-strip">
@@ -179,31 +188,7 @@
               </article>
             </div>
 
-            <div class="editor-grid">
-              <div class="editor-pane">
-                <div class="pane-title">
-                  <span>编辑区</span>
-                  <span>{{ bodyLength }} 字符</span>
-                </div>
-                <textarea
-                  ref="editorRef"
-                  v-model="form.body"
-                  class="editor-textarea"
-                  placeholder="在这里输入正文。上传图片、附件或插入模板时，会按照当前光标位置写入内容。"
-                  @click="captureCursor"
-                  @keyup="captureCursor"
-                  @select="captureCursor"
-                />
-              </div>
-
-              <div class="preview-pane">
-                <div class="pane-title">
-                  <span>预览区</span>
-                  <span>实时渲染</span>
-                </div>
-                <div class="preview-body" v-html="previewHtml"></div>
-              </div>
-            </div>
+            <div ref="quillContainerRef" class="quill-container"></div>
           </div>
         </el-form-item>
 
@@ -229,9 +214,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import Quill from 'quill';
+import 'quill/dist/quill.snow.css';
 import api from '../api';
 
 type AssetKind = 'image' | 'file';
@@ -246,9 +233,11 @@ type UploadedAsset = {
 
 const route = useRoute();
 const router = useRouter();
-const editorRef = ref<HTMLTextAreaElement | null>(null);
+const quillContainerRef = ref<HTMLDivElement | null>(null);
 const contentId = computed(() => Number(route.query.id) || 0);
 const isEditMode = computed(() => contentId.value > 0);
+
+let quill: Quill | null = null;
 
 const categories = ref<Array<{ id: number; name: string }>>([]);
 const tags = ref<Array<{ id: number; name: string }>>([]);
@@ -258,7 +247,6 @@ const uploadedAssets = ref<UploadedAsset[]>([]);
 const coverAsset = ref<UploadedAsset | null>(null);
 const dragActive = ref(false);
 const dragAssetIndex = ref<number | null>(null);
-const cursorRange = ref({ start: 0, end: 0 });
 
 const form = reactive({
   type: 'ARTICLE',
@@ -270,33 +258,7 @@ const form = reactive({
   tagIds: [] as number[]
 });
 
-const bodyLength = computed(() => form.body.trim().length);
 const imageAssets = computed(() => uploadedAssets.value.filter((item) => item.kind === 'image'));
-const previewHtml = computed(() => renderPreview(form.body));
-
-function renderPreview(source: string) {
-  if (!source.trim()) {
-    return '<p class="preview-placeholder">正文预览会显示在这里。你可以拖入图片或附件，也可以使用上方模板快速组织图文结构。</p>';
-  }
-
-  let html = source
-    .replace(/\r\n/g, '\n')
-    .replace(/```([\s\S]*?)```/g, (_match, code) => `<pre><code>${escapeHtml(code.trim())}</code></pre>`)
-    .replace(/^###\s(.+)$/gm, '<h3>$1</h3>')
-    .replace(/^##\s(.+)$/gm, '<h2>$1</h2>')
-    .replace(/^>\s(.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/^\*\*\*(.*)$/gm, '<hr />')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n{2,}/g, '</p><p>');
-
-  html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-  html = `<p>${html}</p>`;
-  html = html.replace(/<p>\s*(<h2|<h3|<blockquote|<pre|<figure|<div|<ul|<hr)/g, '$1');
-  html = html.replace(/(<\/h2>|<\/h3>|<\/blockquote>|<\/pre>|<\/figure>|<\/div>|<\/ul>|<hr \/>)\s*<\/p>/g, '$1');
-  html = html.replace(/<p>\s*<\/p>/g, '');
-  return html;
-}
 
 function escapeHtml(value: string) {
   return value
@@ -318,35 +280,24 @@ function formatAssetSize(size?: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function captureCursor() {
-  if (!editorRef.value) return;
-  cursorRange.value = {
-    start: editorRef.value.selectionStart || 0,
-    end: editorRef.value.selectionEnd || 0
-  };
+function insertHtmlAtCursor(html: string) {
+  if (!quill) return;
+  const range = quill.getSelection(true);
+  if (range) {
+    quill.clipboard.dangerouslyPasteHTML(range.index, html);
+    quill.setSelection(range.index + html.length + 1);
+  }
 }
 
-async function focusEditor(start?: number, end?: number) {
-  await nextTick();
-  if (!editorRef.value) return;
-  const nextStart = typeof start === 'number' ? start : cursorRange.value.start;
-  const nextEnd = typeof end === 'number' ? end : nextStart;
-  editorRef.value.focus();
-  editorRef.value.setSelectionRange(nextStart, nextEnd);
-  cursorRange.value = { start: nextStart, end: nextEnd };
-}
-
-function insertAtCursor(block: string) {
-  const text = form.body || '';
-  const { start, end } = cursorRange.value;
-  const before = text.slice(0, start);
-  const after = text.slice(end);
-  const prefix = before && !before.endsWith('\n') ? '\n\n' : '';
-  const suffix = after && !after.startsWith('\n') ? '\n\n' : '';
-  const next = `${before}${prefix}${block}${suffix}${after}`;
-  const nextCursor = (before + prefix + block).length;
-  form.body = next;
-  focusEditor(nextCursor, nextCursor);
+function insertBlockAtCursor(type: string) {
+  if (!quill) return;
+  const range = quill.getSelection(true);
+  if (!range) return;
+  if (type === 'divider') {
+    quill.insertText(range.index, '\n');
+    quill.insertEmbed(range.index + 1, 'divider', true);
+    quill.setSelection(range.index + 2);
+  }
 }
 
 async function loadTaxonomy() {
@@ -409,6 +360,26 @@ function inferAssetsFromBody() {
   uploadedAssets.value = assets;
 }
 
+function convertMarkdownBodyToHtml(body: string): string {
+  if (!body || !body.trim()) return '';
+  let html = body
+    .replace(/\r\n/g, '\n')
+    .replace(/```([\s\S]*?)```/g, (_match: string, code: string) => `<pre><code>${escapeHtml(code.trim())}</code></pre>`)
+    .replace(/^###\s(.+)$/gm, '<h3>$1</h3>')
+    .replace(/^##\s(.+)$/gm, '<h2>$1</h2>')
+    .replace(/^>\s(.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^\*\*\*(.*)$/gm, '<hr />')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n{2,}/g, '</p><p>');
+  html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p>\s*(<h2|<h3|<blockquote|<pre|<figure|<div|<ul|<hr)/g, '$1');
+  html = html.replace(/(<\/h2>|<\/h3>|<\/blockquote>|<\/pre>|<\/figure>|<\/div>|<\/ul>|<hr \/>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*<\/p>/g, '');
+  return html;
+}
+
 async function loadContent() {
   if (!isEditMode.value) return;
   try {
@@ -427,71 +398,74 @@ async function loadContent() {
   }
 }
 
-function insertBlock(type: 'heading' | 'subheading' | 'divider' | 'quote' | 'list' | 'code') {
-  if (type === 'heading') {
-    insertAtCursor('## 小节标题');
-    return;
-  }
-  if (type === 'subheading') {
-    insertAtCursor('### 细分主题');
-    return;
-  }
-  if (type === 'divider') {
-    insertAtCursor('***');
-    return;
-  }
-  if (type === 'quote') {
-    insertAtCursor('> 在这里输入引用、摘要或关键观点。');
-    return;
-  }
-  if (type === 'list') {
-    insertAtCursor('- 要点一\n- 要点二\n- 要点三');
-    return;
-  }
-  insertAtCursor('```\n// 在这里输入代码示例\n```');
+function initQuill() {
+  if (!quillContainerRef.value) return;
+
+  quill = new Quill(quillContainerRef.value, {
+    modules: {
+      toolbar: false
+    },
+    theme: 'snow',
+    placeholder: '在这里输入正文。上传图片、附件或插入模板时，会按照当前光标位置写入内容。'
+  });
+
+  // Load existing content after Quill is ready
+  nextTick(() => {
+    if (form.body) {
+      const html = convertMarkdownBodyToHtml(form.body);
+      quill!.clipboard.dangerouslyPasteHTML(0, html || '');
+    }
+  });
+
+  // Sync content on change
+  quill.on('text-change', () => {
+    if (quill) {
+      form.body = quill.root.innerHTML;
+    }
+  });
 }
 
 function insertTemplate(type: 'article' | 'tutorial' | 'qa' | 'gallery') {
   if (type === 'article') {
-    insertAtCursor([
-      '## 核心观点',
-      '这里先用一段文字概括本节重点。',
-      '',
-      '## 展开说明',
-      '再用两到三段正文详细说明背景、做法和结果。'
-    ].join('\n'));
+    insertHtmlAtCursor([
+      '<h2>核心观点</h2>',
+      '<p>这里先用一段文字概括本节重点。</p>',
+      '<h2>展开说明</h2>',
+      '<p>再用两到三段正文详细说明背景、做法和结果。</p>'
+    ].join(''));
     return;
   }
 
   if (type === 'tutorial') {
-    insertAtCursor([
-      '## 操作步骤',
-      '- 第一步：说明准备工作',
-      '- 第二步：说明关键配置',
-      '- 第三步：说明运行结果',
-      '',
-      '> 小提示：可以在步骤之间插入截图或附件链接。'
-    ].join('\n'));
+    insertHtmlAtCursor([
+      '<h2>操作步骤</h2>',
+      '<ol>',
+      '<li>第一步：说明准备工作</li>',
+      '<li>第二步：说明关键配置</li>',
+      '<li>第三步：说明运行结果</li>',
+      '</ol>',
+      '<blockquote>小提示：可以在步骤之间插入截图或附件链接。</blockquote>'
+    ].join(''));
     return;
   }
 
   if (type === 'qa') {
-    insertAtCursor([
-      '## 问题背景',
-      '说明问题发生在什么场景下。',
-      '',
-      '## 排查过程',
-      '- 观察到的现象',
-      '- 尝试过的办法',
-      '- 最终定位结果',
-      '',
-      '## 解决方案',
-      '给出可以直接复用的解决办法。'
-    ].join('\n'));
+    insertHtmlAtCursor([
+      '<h2>问题背景</h2>',
+      '<p>说明问题发生在什么场景下。</p>',
+      '<h2>排查过程</h2>',
+      '<ul>',
+      '<li>观察到的现象</li>',
+      '<li>尝试过的办法</li>',
+      '<li>最终定位结果</li>',
+      '</ul>',
+      '<h2>解决方案</h2>',
+      '<p>给出可以直接复用的解决办法。</p>'
+    ].join(''));
     return;
   }
 
-  insertAtCursor([
+  insertHtmlAtCursor([
     '<div class="image-gallery">',
     '  <figure class="content-figure">',
     '    <img src="https://placehold.co/640x360?text=Image+1" alt="示意图一" />',
@@ -545,7 +519,7 @@ function buildAttachmentBlock(asset: UploadedAsset) {
 
 function insertCoverBlock() {
   if (!coverAsset.value) return;
-  insertAtCursor(buildImageBlock(coverAsset.value));
+  insertHtmlAtCursor(buildImageBlock(coverAsset.value));
 }
 
 function normalizeAssetOrder() {
@@ -603,7 +577,7 @@ function insertImageGallery() {
     ].join('\n')),
     '</div>'
   ].join('\n');
-  insertAtCursor(gallery);
+  insertHtmlAtCursor(gallery);
 }
 
 async function onCoverSelected(e: Event) {
@@ -625,7 +599,7 @@ async function onImageSelected(e: Event) {
   if (!input.files || input.files.length === 0) return;
   try {
     const asset = await uploadAsset(input.files[0], 'image');
-    insertAtCursor(buildImageBlock(asset));
+    insertHtmlAtCursor(buildImageBlock(asset));
     ElMessage.success('图片已按光标位置插入');
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.message || err.message || '图片上传失败');
@@ -639,7 +613,7 @@ async function onAttachmentSelected(e: Event) {
   if (!input.files || input.files.length === 0) return;
   try {
     const asset = await uploadAsset(input.files[0], 'file');
-    insertAtCursor(buildAttachmentBlock(asset));
+    insertHtmlAtCursor(buildAttachmentBlock(asset));
     ElMessage.success('附件已按光标位置插入');
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.message || err.message || '附件上传失败');
@@ -662,7 +636,7 @@ async function uploadAsset(file: File, kind: AssetKind) {
 }
 
 function insertAsset(asset: UploadedAsset) {
-  insertAtCursor(asset.kind === 'image' ? buildImageBlock(asset) : buildAttachmentBlock(asset));
+  insertHtmlAtCursor(asset.kind === 'image' ? buildImageBlock(asset) : buildAttachmentBlock(asset));
 }
 
 function removeAsset(url: string) {
@@ -689,7 +663,7 @@ async function onDropFiles(e: DragEvent) {
     try {
       const kind: AssetKind = file.type.startsWith('image/') ? 'image' : 'file';
       const asset = await uploadAsset(file, kind);
-      insertAtCursor(kind === 'image' ? buildImageBlock(asset) : buildAttachmentBlock(asset));
+      insertHtmlAtCursor(kind === 'image' ? buildImageBlock(asset) : buildAttachmentBlock(asset));
     } catch (err: any) {
       ElMessage.error(err?.response?.data?.message || err.message || `上传失败：${file.name}`);
     }
@@ -707,7 +681,7 @@ function validateForm() {
     ElMessage.warning('请选择分类');
     return false;
   }
-  if (!form.body.trim()) {
+  if (!form.body.trim() || form.body === '<p><br></p>') {
     ElMessage.warning('请输入正文内容');
     return false;
   }
@@ -762,7 +736,60 @@ async function submitPublish() {
 onMounted(async () => {
   await loadTaxonomy();
   await loadContent();
-  await focusEditor(0, 0);
+  // Init Quill after DOM is ready and taxonomy/content are loaded
+  await nextTick();
+  initQuill();
+  // Set up toolbar handlers after Quill is initialized
+  await nextTick();
+  setupToolbarButtons();
+});
+
+function setupToolbarButtons() {
+  if (!quill) return;
+  document.querySelector('.editor-toolbar')?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const qlBtn = target.closest('button[class*="ql-"], select[class*="ql-"]');
+    if (!qlBtn) return;
+
+    e.preventDefault();
+    const classes = qlBtn.className.split(' ');
+    const formatClass = classes.find(c => c.startsWith('ql-'));
+
+    if (qlBtn.tagName === 'SELECT') {
+      const sel = qlBtn as HTMLSelectElement;
+      const value = sel.value;
+      if (formatClass === 'ql-header') {
+        const headerValue = value && value !== 'false' ? value : false;
+        if (headerValue) {
+          quill!.format('header', parseInt(headerValue as string));
+        } else {
+          quill!.format('header', false);
+        }
+      }
+      return;
+    }
+
+    if (formatClass === 'ql-bold') quill!.format('bold', !quill!.getFormat().bold);
+    else if (formatClass === 'ql-italic') quill!.format('italic', !quill!.getFormat().italic);
+    else if (formatClass === 'ql-underline') quill!.format('underline', !quill!.getFormat().underline);
+    else if (formatClass === 'ql-blockquote') quill!.format('blockquote', !quill!.getFormat().blockquote);
+    else if (formatClass === 'ql-code') quill!.format('code', !quill!.getFormat().code);
+    else if (formatClass === 'ql-code-block') quill!.format('code-block', !quill!.getFormat()['code-block']);
+    else if (formatClass === 'ql-list' && qlBtn.getAttribute('value') === 'ordered') quill!.format('list', 'ordered');
+    else if (formatClass === 'ql-list' && qlBtn.getAttribute('value') === 'bullet') quill!.format('list', 'bullet');
+    else if (formatClass === 'ql-link') {
+      const url = prompt('输入链接地址:');
+      if (url) quill!.format('link', url);
+    }
+    else if (formatClass === 'ql-clean') {
+      const range = quill!.getSelection();
+      if (range && range.length > 0) quill!.removeFormat(range.index, range.length);
+    }
+  });
+}
+
+onBeforeUnmount(() => {
+  quill = null;
 });
 </script>
 
@@ -874,7 +901,7 @@ onMounted(async () => {
 .editor-shell {
   border: 1px solid #dbe4f0;
   border-radius: 24px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  background: #fff;
   overflow: hidden;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -896,6 +923,7 @@ onMounted(async () => {
 .editor-toolbar {
   border-bottom: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(248, 250, 252, 0.94);
+  flex-wrap: wrap;
 }
 
 .asset-toolbar {
@@ -926,6 +954,40 @@ onMounted(async () => {
 .tool-tip {
   color: #64748b;
   font-size: 13px;
+}
+
+/* Quill toolbar button styling */
+.ql-header {
+  width: 100px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+button[class*="ql-"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: #475569;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+button[class*="ql-"]:hover {
+  background: rgba(22, 119, 255, 0.08);
+  color: #1677ff;
 }
 
 .asset-strip {
@@ -974,78 +1036,36 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.editor-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+.quill-container {
+  min-height: 500px;
 }
 
-.editor-pane,
-.preview-pane {
-  padding: 18px;
-}
-
-.preview-pane {
-  border-left: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(248, 250, 252, 0.68);
-}
-
-.pane-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  color: #475569;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.editor-textarea {
-  width: 100%;
-  min-height: 520px;
-  padding: 16px 18px;
-  border: 1px solid #dbe4f0;
-  border-radius: 18px;
-  background: #fff;
-  color: #0f172a;
-  font: inherit;
+.quill-container :deep(.ql-editor) {
+  min-height: 500px;
+  padding: 18px 20px;
+  font-size: 15px;
   line-height: 1.9;
-  resize: vertical;
-  outline: none;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
-}
-
-.editor-textarea:focus {
-  border-color: #1677ff;
-  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.1);
-}
-
-.preview-body {
-  min-height: 520px;
-  padding: 18px;
-  border-radius: 18px;
-  background: #fff;
   color: #0f172a;
-  line-height: 1.9;
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
 
-.preview-body :deep(p) {
-  margin: 0 0 16px;
+.quill-container :deep(.ql-editor.ql-blank::before) {
+  color: #94a3b8;
+  font-style: normal;
 }
 
-.preview-body :deep(h2) {
+.quill-container :deep(.ql-editor h2) {
   margin: 24px 0 12px;
   font-size: 26px;
   color: #0f172a;
 }
 
-.preview-body :deep(h3) {
+.quill-container :deep(.ql-editor h3) {
   margin: 20px 0 10px;
   font-size: 20px;
   color: #1e293b;
 }
 
-.preview-body :deep(blockquote) {
+.quill-container :deep(.ql-editor blockquote) {
   margin: 18px 0;
   padding: 12px 16px;
   border-left: 4px solid #1677ff;
@@ -1054,55 +1074,51 @@ onMounted(async () => {
   color: #475569;
 }
 
-.preview-body :deep(pre) {
+.quill-container :deep(.ql-editor pre.ql-syntax) {
   overflow: auto;
   margin: 20px 0;
   padding: 16px;
   border-radius: 14px;
   background: #0f172a;
   color: #e2e8f0;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 14px;
 }
 
-.preview-body :deep(ul) {
+.quill-container :deep(.ql-editor ul),
+.quill-container :deep(.ql-editor ol) {
   margin: 0 0 18px 20px;
   padding: 0;
 }
 
-.preview-body :deep(li) {
+.quill-container :deep(.ql-editor li) {
   margin-bottom: 8px;
 }
 
-.preview-body :deep(hr) {
-  margin: 24px 0;
-  border: none;
-  border-top: 1px solid #dbe4f0;
-}
-
-.preview-body :deep(.content-figure) {
-  display: grid;
-  gap: 10px;
+.quill-container :deep(.ql-editor .content-figure) {
   margin: 20px 0;
 }
 
-.preview-body :deep(.content-figure img) {
+.quill-container :deep(.ql-editor .content-figure img) {
   width: 100%;
   border-radius: 18px;
   box-shadow: 0 14px 24px rgba(15, 23, 42, 0.1);
 }
 
-.preview-body :deep(.content-figure figcaption) {
+.quill-container :deep(.ql-editor .content-figure figcaption) {
+  margin-top: 8px;
   color: #64748b;
   font-size: 13px;
   text-align: center;
 }
 
-.preview-body :deep(.image-gallery) {
+.quill-container :deep(.ql-editor .image-gallery) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
-.preview-body :deep(.attachment-card) {
+.quill-container :deep(.ql-editor .attachment-card) {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 14px;
@@ -1113,7 +1129,7 @@ onMounted(async () => {
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
 }
 
-.preview-body :deep(.attachment-card__icon) {
+.quill-container :deep(.ql-editor .attachment-card__icon) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1126,23 +1142,19 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-.preview-body :deep(.attachment-card__body) {
+.quill-container :deep(.ql-editor .attachment-card__body) {
   display: grid;
   gap: 4px;
 }
 
-.preview-body :deep(.attachment-card__body strong) {
+.quill-container :deep(.ql-editor .attachment-card__body strong) {
   color: #0f172a;
 }
 
-.preview-body :deep(.attachment-card__body span),
-.preview-body :deep(.attachment-card__body a) {
+.quill-container :deep(.ql-editor .attachment-card__body span),
+.quill-container :deep(.ql-editor .attachment-card__body a) {
   color: #64748b;
   font-size: 13px;
-}
-
-.preview-placeholder {
-  color: #94a3b8;
 }
 
 .review-tip {
@@ -1156,23 +1168,16 @@ onMounted(async () => {
 }
 
 @media (max-width: 980px) {
-  .cover-shell,
-  .editor-grid {
+  .cover-shell {
     grid-template-columns: 1fr;
   }
 
-  .preview-pane {
-    border-left: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.22);
-  }
-
-  .header-row,
   .editor-toolbar,
   .asset-toolbar {
     display: grid;
   }
 
-  .preview-body :deep(.image-gallery) {
+  .quill-container :deep(.ql-editor .image-gallery) {
     grid-template-columns: 1fr;
   }
 }
