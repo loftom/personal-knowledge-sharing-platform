@@ -21,6 +21,12 @@
           clearable
           @input="onKeywordChange"
         />
+        <el-select v-model="categoryId" clearable placeholder="全部分类" @change="load">
+          <el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
+        </el-select>
+        <el-select v-model="tagId" clearable placeholder="全部标签" @change="load">
+          <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id" />
+        </el-select>
         <el-select v-model="statusFilter" placeholder="问题状态" @change="applyFilter">
           <el-option label="全部状态" value="ALL" />
           <el-option label="待回答" value="PENDING" />
@@ -75,7 +81,11 @@ import dayjs from 'dayjs';
 import api from '../api';
 
 const keyword = ref('');
+const categoryId = ref<number | undefined>();
+const tagId = ref<number | undefined>();
 const rawList = ref<any[]>([]);
+const categories = ref<Array<{ id: number; name: string }>>([]);
+const tags = ref<Array<{ id: number; name: string }>>([]);
 const loading = ref(false);
 const statusFilter = ref('ALL');
 let searchTimer: number | null = null;
@@ -97,10 +107,35 @@ function statusTagType(status?: string) {
   return status === 'RESOLVED' ? 'success' : 'warning';
 }
 
+function sanitizeTaxonomyName(value: string) {
+  return (value || '').trim() || '未命名';
+}
+
+async function loadTaxonomy() {
+  const [categoryRes, tagRes] = await Promise.all([
+    api.get('/public/taxonomy/categories'),
+    api.get('/public/taxonomy/tags')
+  ]);
+  categories.value = (categoryRes.data.data || []).map((item: any) => ({
+    ...item,
+    name: sanitizeTaxonomyName(item.name)
+  }));
+  tags.value = (tagRes.data.data || []).map((item: any) => ({
+    ...item,
+    name: sanitizeTaxonomyName(item.name)
+  }));
+}
+
 async function load() {
   loading.value = true;
   try {
-    const res = await api.get('/qa/questions', { params: { keyword: keyword.value } });
+    const res = await api.get('/qa/questions', {
+      params: {
+        keyword: keyword.value || undefined,
+        categoryId: categoryId.value,
+        tagId: tagId.value
+      }
+    });
     rawList.value = res.data.data || [];
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '加载问答列表失败');
@@ -115,10 +150,13 @@ function onKeywordChange() {
 }
 
 function applyFilter() {
-  // 预留给后续服务端状态筛选
+  // 状态筛选在前端 computed 中完成，无需额外操作
 }
 
-onMounted(load);
+onMounted(async () => {
+  await loadTaxonomy();
+  await load();
+});
 </script>
 
 <style scoped>

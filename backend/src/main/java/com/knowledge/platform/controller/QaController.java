@@ -48,7 +48,9 @@ public class QaController {
     }
 
     @GetMapping("/questions")
-    public ApiResponse<List<Phase2Dtos.QuestionListItem>> questions(@RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(qaService.questions(keyword));
+    public ApiResponse<List<Phase2Dtos.QuestionListItem>> questions(@RequestParam(required = false) String keyword,
+                                                                     @RequestParam(required = false) Long categoryId,
+                                                                     @RequestParam(required = false) Long tagId) {
+        return ApiResponse.ok(qaService.questions(keyword, categoryId, tagId));
     }
 }

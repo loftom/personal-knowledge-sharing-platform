@@ -5,11 +5,13 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.knowledge.platform.common.AppException;
 import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.domain.entity.Content;
+import com.knowledge.platform.domain.entity.ContentTag;
 import com.knowledge.platform.domain.entity.FollowRelation;
 import com.knowledge.platform.domain.entity.QaAnswer;
 import com.knowledge.platform.domain.entity.QaQuestion;
 import com.knowledge.platform.domain.entity.User;
 import com.knowledge.platform.domain.mapper.ContentMapper;
+import com.knowledge.platform.domain.mapper.ContentTagMapper;
 import com.knowledge.platform.domain.mapper.FollowRelationMapper;
 import com.knowledge.platform.domain.mapper.QaAnswerMapper;
 import com.knowledge.platform.domain.mapper.QaQuestionMapper;
@@ -32,6 +34,7 @@ public class QaService {
     private final QaQuestionMapper qaQuestionMapper;
     private final QaAnswerMapper qaAnswerMapper;
     private final ContentMapper contentMapper;
+    private final ContentTagMapper contentTagMapper;
     private final FollowRelationMapper followRelationMapper;
     private final UserMapper userMapper;
     private final BehaviorService behaviorService;
@@ -42,6 +45,7 @@ public class QaService {
     public QaService(QaQuestionMapper qaQuestionMapper,
                      QaAnswerMapper qaAnswerMapper,
                      ContentMapper contentMapper,
+                     ContentTagMapper contentTagMapper,
                      FollowRelationMapper followRelationMapper,
                      UserMapper userMapper,
                      BehaviorService behaviorService,
@@ -51,6 +55,7 @@ public class QaService {
         this.qaQuestionMapper = qaQuestionMapper;
         this.qaAnswerMapper = qaAnswerMapper;
         this.contentMapper = contentMapper;
+        this.contentTagMapper = contentTagMapper;
         this.followRelationMapper = followRelationMapper;
         this.userMapper = userMapper;
         this.behaviorService = behaviorService;
@@ -194,7 +199,9 @@ public class QaService {
                 .collect(Collectors.toList());
     }
 
-    public List<Phase2Dtos.QuestionListItem> questions(String keyword) {
+    public List<Phase2Dtos.QuestionListItem> questions(String keyword,
+                                                        Long categoryId,
+                                                        Long tagId) {
         LambdaQueryWrapper<Content> wrapper = new LambdaQueryWrapper<Content>()
                 .eq(Content::getType, "QUESTION")
                 .eq(Content::getStatus, "PUBLISHED")
@@ -202,11 +209,22 @@ public class QaService {
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(Content::getTitle, keyword).or().like(Content::getBody, keyword));
         }
+        if (categoryId != null) {
+            wrapper.eq(Content::getCategoryId, categoryId);
+        }
         List<Content> questions = contentMapper.selectList(wrapper);
         Long currentUserId = UserContext.getUserId();
         questions = questions.stream()
                 .filter(content -> canAccessQuestion(content, currentUserId))
                 .toList();
+        if (tagId != null) {
+            List<Long> taggedIds = contentTagMapper.selectList(new LambdaQueryWrapper<ContentTag>()
+                            .eq(ContentTag::getTagId, tagId))
+                    .stream()
+                    .map(ContentTag::getContentId)
+                    .toList();
+            questions = questions.stream().filter(c -> taggedIds.contains(c.getId())).toList();
+        }
         Map<Long, User> userMap = loadUserMap(questions.stream().map(Content::getAuthorId).toList());
         return questions.stream()
                 .map(content -> toQuestionListItem(content, userMap.get(content.getAuthorId())))
