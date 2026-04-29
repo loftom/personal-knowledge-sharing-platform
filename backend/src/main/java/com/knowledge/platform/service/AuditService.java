@@ -1,6 +1,7 @@
 package com.knowledge.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.knowledge.platform.common.AppException;
 import com.knowledge.platform.domain.entity.SensitiveWord;
 import com.knowledge.platform.domain.mapper.SensitiveWordMapper;
 import jakarta.annotation.PostConstruct;
@@ -94,5 +95,46 @@ public class AuditService {
         return Normalizer.normalize(text, Normalizer.Form.NFKC)
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}\\p{S}]+", "");
+    }
+
+    // ---- Sensitive word CRUD ----
+
+    public List<SensitiveWord> listWords() {
+        return sensitiveWordMapper.selectList(new LambdaQueryWrapper<SensitiveWord>()
+                .orderByAsc(SensitiveWord::getId));
+    }
+
+    public SensitiveWord addWord(String word) {
+        if (word == null || word.isBlank()) {
+            throw new AppException("敏感词不能为空");
+        }
+        long exists = sensitiveWordMapper.selectCount(new LambdaQueryWrapper<SensitiveWord>()
+                .eq(SensitiveWord::getWord, word.trim()));
+        if (exists > 0) {
+            throw new AppException("敏感词已存在");
+        }
+        SensitiveWord item = new SensitiveWord();
+        item.setWord(word.trim());
+        item.setEnabled(1);
+        sensitiveWordMapper.insert(item);
+        return item;
+    }
+
+    public void updateWord(Long id, String word, Integer enabled) {
+        SensitiveWord item = sensitiveWordMapper.selectById(id);
+        if (item == null) {
+            throw new AppException("敏感词不存在");
+        }
+        if (word != null && !word.isBlank()) {
+            item.setWord(word.trim());
+        }
+        if (enabled != null) {
+            item.setEnabled(enabled);
+        }
+        sensitiveWordMapper.updateById(item);
+    }
+
+    public void deleteWord(Long id) {
+        sensitiveWordMapper.deleteById(id);
     }
 }

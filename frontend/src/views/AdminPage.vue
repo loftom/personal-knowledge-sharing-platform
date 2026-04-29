@@ -29,6 +29,9 @@
           <button class="menu-item" :class="{ active: activeView === 'taxonomy' }" @click="activeView = 'taxonomy'">
             分类标签
           </button>
+          <button class="menu-item" :class="{ active: activeView === 'sensitive-word' }" @click="activeView = 'sensitive-word'">
+            敏感词管理
+          </button>
         </div>
 
         <div class="menu-group">
@@ -174,6 +177,8 @@
           <AdminAuditPage v-if="activeView === 'audit'" />
           <AdminPreferencePage v-else-if="activeView === 'preference'" />
           <AdminManagePage v-else-if="activeView === 'manage'" />
+          <TaxonomyManage v-else-if="activeView === 'taxonomy'" />
+          <SensitiveWordManage v-else-if="activeView === 'sensitive-word'" />
           <TaxonomyManage v-else />
         </section>
       </template>
@@ -191,8 +196,9 @@ import TaxonomyManage from './TaxonomyManage.vue';
 import AdminAuditPage from './AdminAuditPage.vue';
 import AdminPreferencePage from './AdminPreferencePage.vue';
 import AdminManagePage from './AdminManagePage.vue';
+import SensitiveWordManage from './SensitiveWordManage.vue';
 
-type AdminView = 'overview' | 'audit' | 'preference' | 'taxonomy' | 'manage';
+type AdminView = 'overview' | 'audit' | 'preference' | 'taxonomy' | 'manage' | 'sensitive-word';
 
 const router = useRouter();
 const isAdmin = computed(() => hasAdminSession());
@@ -209,6 +215,7 @@ const currentLabel = computed(() => {
   if (activeView.value === 'preference') return '用户偏好';
   if (activeView.value === 'manage') return '用户与内容管理';
   if (activeView.value === 'taxonomy') return '分类标签';
+  if (activeView.value === 'sensitive-word') return '敏感词管理';
   return '数据概览';
 });
 
@@ -217,6 +224,7 @@ const currentTitle = computed(() => {
   if (activeView.value === 'preference') return '用户偏好洞察';
   if (activeView.value === 'manage') return '用户与内容管理';
   if (activeView.value === 'taxonomy') return '分类与标签管理';
+  if (activeView.value === 'sensitive-word') return '敏感词库管理';
   return '后台数据概览';
 });
 
