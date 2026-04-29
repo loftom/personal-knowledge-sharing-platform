@@ -74,13 +74,41 @@
                       <div class="comment-meta">
                         <strong>{{ comment.displayName || `用户 ${comment.userId}` }}</strong>
                         <span>{{ formatTime(comment.createdAt) }}</span>
+                        <span v-if="comment.isEdited" class="edited-mark">（已编辑）</span>
                       </div>
-                      <el-button text type="primary" :disabled="!isLoggedIn" @click="toggleReply(comment.id)">
-                        {{ replyingTo === comment.id ? '取消回复' : '回复' }}
-                      </el-button>
+                      <div class="comment-actions">
+                        <el-button text size="small" :type="comment.isLiked ? 'primary' : undefined" @click="toggleCommentLike(comment)">
+                          👍
+                          <span v-if="comment.likeCount > 0" style="margin-left: 4px">{{ comment.likeCount }}</span>
+                        </el-button>
+                        <el-button text type="primary" size="small" :disabled="!isLoggedIn" @click="toggleReply(comment.id)">
+                          {{ replyingTo === comment.id ? '取消回复' : '回复' }}
+                        </el-button>
+                        <el-button v-if="isCommentOwner(comment)" text size="small" @click="startEditComment(comment)">
+                          编辑
+                        </el-button>
+                        <el-button v-if="isCommentOwner(comment)" text size="small" type="danger" @click="handleDeleteComment(comment)">
+                          删除
+                        </el-button>
+                      </div>
                     </div>
 
-                    <div class="comment-body">{{ comment.body }}</div>
+                    <div v-if="editingCommentId === comment.id" class="comment-editor">
+                      <el-input
+                        v-model="editingCommentBody"
+                        type="textarea"
+                        :rows="3"
+                        resize="none"
+                        placeholder="修改评论内容"
+                      />
+                      <div class="comment-editor-actions">
+                        <el-button size="small" @click="cancelEditComment">取消</el-button>
+                        <el-button type="primary" size="small" :loading="editingCommentSaving" @click="submitEditComment(comment.id)">
+                          保存
+                        </el-button>
+                      </div>
+                    </div>
+                    <div v-else class="comment-body">{{ comment.body }}</div>
 
                     <div v-if="replyingTo === comment.id" class="reply-editor">
                       <el-input
@@ -104,8 +132,34 @@
                         <div class="reply-line">
                           <strong>{{ reply.displayName || `用户 ${reply.userId}` }}</strong>
                           <span>{{ formatTime(reply.createdAt) }}</span>
+                          <span v-if="reply.isEdited" class="edited-mark">（已编辑）</span>
                         </div>
-                        <div class="reply-text">{{ reply.body }}</div>
+                        <div v-if="editingReplyId === reply.id" class="comment-editor">
+                          <el-input
+                            v-model="editingReplyBody"
+                            type="textarea"
+                            :rows="2"
+                            resize="none"
+                          />
+                          <div class="comment-editor-actions">
+                            <el-button size="small" @click="cancelEditReply">取消</el-button>
+                            <el-button type="primary" size="small" :loading="editingCommentSaving" @click="submitEditReply(reply.id)">
+                              保存
+                            </el-button>
+                          </div>
+                        </div>
+                        <div v-else class="reply-text">{{ reply.body }}</div>
+                        <div class="reply-actions-row">
+                          <el-button text size="small" :type="reply.isLiked ? 'primary' : undefined" @click="toggleCommentLike(reply)">
+                            👍 <span v-if="reply.likeCount > 0" style="margin-left: 2px">{{ reply.likeCount }}</span>
+                          </el-button>
+                          <el-button v-if="isCommentOwner(reply)" text size="small" @click="startEditReply(reply)">
+                            编辑
+                          </el-button>
+                          <el-button v-if="isCommentOwner(reply)" text size="small" type="danger" @click="handleDeleteComment(reply)">
+                            删除
+                          </el-button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -186,7 +240,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
 import api from '../api';
 
@@ -209,6 +263,122 @@ const loading = ref(false);
 const liked = ref(false);
 const favorited = ref(false);
 const isLoggedIn = computed(() => !!localStorage.getItem('token'));
+
+// 评论编辑/点赞相关状态
+const editingCommentId = ref<number | null>(null);
+const editingCommentBody = ref('');
+const editingCommentSaving = ref(false);
+const editingReplyId = ref<number | null>(null);
+const editingReplyBody = ref('');
+
+const currentUserId = computed(() => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload?.userId || payload?.sub || null;
+  } catch {
+    return null;
+  }
+});
+
+function isCommentOwner(comment: any): boolean {
+  const uid = currentUserId.value;
+  if (!uid || !comment?.userId) return false;
+  return Number(uid) === Number(comment.userId);
+}
+
+function startEditComment(comment: any) {
+  editingCommentId.value = comment.id;
+  editingCommentBody.value = comment.body || '';
+}
+
+function cancelEditComment() {
+  editingCommentId.value = null;
+  editingCommentBody.value = '';
+}
+
+async function submitEditComment(commentId: number) {
+  if (!editingCommentBody.value.trim()) {
+    ElMessage.warning('评论内容不能为空');
+    return;
+  }
+  editingCommentSaving.value = true;
+  try {
+    await api.put(`/interaction/comment/${commentId}`, { body: editingCommentBody.value.trim() });
+    editingCommentId.value = null;
+    editingCommentBody.value = '';
+    await loadDetail(false, true);
+    ElMessage.success('评论已修改');
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e.message || '修改评论失败');
+  } finally {
+    editingCommentSaving.value = false;
+  }
+}
+
+function startEditReply(reply: any) {
+  editingReplyId.value = reply.id;
+  editingReplyBody.value = reply.body || '';
+}
+
+function cancelEditReply() {
+  editingReplyId.value = null;
+  editingReplyBody.value = '';
+}
+
+async function submitEditReply(replyId: number) {
+  if (!editingReplyBody.value.trim()) {
+    ElMessage.warning('回复内容不能为空');
+    return;
+  }
+  editingCommentSaving.value = true;
+  try {
+    await api.put(`/interaction/comment/${replyId}`, { body: editingReplyBody.value.trim() });
+    editingReplyId.value = null;
+    editingReplyBody.value = '';
+    await loadDetail(false, true);
+    ElMessage.success('回复已修改');
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e.message || '修改回复失败');
+  } finally {
+    editingCommentSaving.value = false;
+  }
+}
+
+async function handleDeleteComment(comment: any) {
+  try {
+    await ElMessageBox.confirm('确定要删除这条评论吗？删除后不可恢复。', '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+  } catch {
+    return;
+  }
+  try {
+    await api.delete(`/interaction/comment/${comment.id}`);
+    await loadDetail(false, true);
+    ElMessage.success('评论已删除');
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e.message || '删除评论失败');
+  }
+}
+
+async function toggleCommentLike(comment: any) {
+  if (!requireLogin()) return;
+  try {
+    await api.post('/interaction/like/toggle', { targetId: comment.id, targetType: 'COMMENT' });
+    comment.isLiked = !comment.isLiked;
+    if (comment.isLiked) {
+      comment.likeCount = (comment.likeCount || 0) + 1;
+    } else {
+      comment.likeCount = Math.max(0, (comment.likeCount || 0) - 1);
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e.message || '评论点赞失败');
+  }
+}
 
 const rootComments = computed(() => comments.value.filter((item) => !item.parentId || item.parentId === 0));
 const childrenMap = computed(() => {
@@ -832,6 +1002,37 @@ onMounted(loadDetail);
   margin-top: 10px;
   color: #1f2329;
   line-height: 1.9;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.edited-mark {
+  color: #8590a6;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.comment-editor {
+  margin-top: 10px;
+}
+
+.comment-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reply-actions-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
 }
 
 .reply-editor {

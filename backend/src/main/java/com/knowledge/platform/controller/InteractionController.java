@@ -42,4 +42,17 @@ public class InteractionController {
     public ApiResponse<List<ContentDtos.CommentView>> listComments(@PathVariable Long contentId) {
         return ApiResponse.ok(interactionService.listComments(contentId));
     }
+
+    @PutMapping("/comment/{commentId}")
+    public ApiResponse<Void> editComment(@PathVariable Long commentId,
+                                          @RequestBody Map<String, String> body) {
+        interactionService.editComment(commentId, body.get("body"));
+        return ApiResponse.ok();
+    }
+
+    @DeleteMapping("/comment/{commentId}")
+    public ApiResponse<Void> deleteComment(@PathVariable Long commentId) {
+        interactionService.deleteComment(commentId);
+        return ApiResponse.ok();
+    }
 }

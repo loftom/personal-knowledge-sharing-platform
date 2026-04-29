@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -162,6 +163,7 @@ public class InteractionService {
     }
 
     public List<ContentDtos.CommentView> listComments(Long contentId) {
+        Long currentUserId = UserContext.getUserId();
         List<Comment> comments = commentMapper.selectList(new LambdaQueryWrapper<Comment>()
                 .eq(Comment::getContentId, contentId)
                 .eq(Comment::getStatus, 1)
@@ -176,10 +178,55 @@ public class InteractionService {
             userMap = userMapper.selectBatchIds(userIds).stream()
                     .collect(Collectors.toMap(User::getId, user -> user));
         }
+
+        // Build liked set for current user
+        Set<Long> likedCommentIds = new java.util.HashSet<>();
+        if (currentUserId != null && !comments.isEmpty()) {
+            List<Long> commentIds = comments.stream().map(Comment::getId).toList();
+            likedCommentIds = new java.util.HashSet<>(likeRecordMapper.selectList(new LambdaQueryWrapper<LikeRecord>()
+                    .eq(LikeRecord::getUserId, currentUserId)
+                    .eq(LikeRecord::getTargetType, "COMMENT")
+                    .in(LikeRecord::getTargetId, commentIds))
+                    .stream()
+                    .map(LikeRecord::getTargetId)
+                    .toList());
+        }
+
         final Map<Long, User> finalUserMap = userMap;
+        final Set<Long> finalLikedIds = likedCommentIds;
         return comments.stream()
-                .map(comment -> toCommentView(comment, finalUserMap.get(comment.getUserId())))
+                .map(comment -> toCommentView(comment, finalUserMap.get(comment.getUserId()), finalLikedIds.contains(comment.getId())))
                 .toList();
+    }
+
+    public void editComment(Long commentId, String newBody) {
+        Long userId = UserContext.getUserId();
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null || comment.getStatus() == 0) {
+            throw new AppException("评论不存在");
+        }
+        if (!comment.getUserId().equals(userId)) {
+            throw new AppException("只能编辑自己的评论");
+        }
+        if (newBody == null || newBody.isBlank()) {
+            throw new AppException("评论内容不能为空");
+        }
+        comment.setBody(newBody.trim());
+        commentMapper.updateById(comment);
+    }
+
+    public void deleteComment(Long commentId) {
+        Long userId = UserContext.getUserId();
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null || comment.getStatus() == 0) {
+            throw new AppException("评论不存在");
+        }
+        boolean isAdmin = UserContext.isAdmin();
+        if (!comment.getUserId().equals(userId) && !isAdmin) {
+            throw new AppException("只能删除自己的评论");
+        }
+        comment.setStatus(0);
+        commentMapper.updateById(comment);
     }
 
     public boolean hasLikedContent(Long contentId, Long userId) {
@@ -201,7 +248,7 @@ public class InteractionService {
                 .eq(FavoriteRecord::getContentId, contentId)) > 0;
     }
 
-    private ContentDtos.CommentView toCommentView(Comment comment, User user) {
+    private ContentDtos.CommentView toCommentView(Comment comment, User user, boolean isLiked) {
         ContentDtos.CommentView view = new ContentDtos.CommentView();
         view.setId(comment.getId());
         view.setContentId(comment.getContentId());
@@ -210,6 +257,7 @@ public class InteractionService {
         view.setBody(comment.getBody());
         view.setLikeCount(comment.getLikeCount());
         view.setStatus(comment.getStatus());
+        view.setIsLiked(isLiked);
         view.setCreatedAt(comment.getCreatedAt());
         if (user != null) {
             view.setUsername(user.getUsername());
