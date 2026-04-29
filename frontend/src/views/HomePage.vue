@@ -42,6 +42,18 @@
         <el-select v-model="sortBy" placeholder="排序方式" @change="load">
           <el-option v-for="item in sortOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="起始日期"
+          end-placeholder="结束日期"
+          format="YYYY-MM-DD"
+          value-format="YYYY-MM-DD"
+          :shortcuts="dateShortcuts"
+          style="width: 260px"
+          @change="load"
+        />
       </div>
 
       <div v-loading="loading" class="feed-list">
@@ -83,6 +95,17 @@
       <div v-if="!loading && list.length === 0" class="empty-wrap">
         <el-empty description="当前筛选条件下暂无内容，请尝试调整检索条件后重试。" />
       </div>
+
+      <div v-if="totalPages > 1" class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="totalCount"
+          :pager-count="5"
+          layout="total, prev, pager, next"
+          @current-change="load"
+        />
+      </div>
     </section>
   </div>
 </template>
@@ -96,6 +119,11 @@ const keyword = ref('');
 const categoryId = ref<number | undefined>();
 const tagId = ref<number | undefined>();
 const sortBy = ref('publishedAt');
+const dateRange = ref<[string, string] | null>(null);
+const page = ref(1);
+const pageSize = ref(20);
+const totalCount = ref(0);
+const totalPages = ref(0);
 const list = ref<any[]>([]);
 const categories = ref<any[]>([]);
 const tags = ref<any[]>([]);
@@ -107,6 +135,11 @@ const sortOptions = [
   { label: '按阅读量', value: 'views' },
   { label: '按点赞量', value: 'likes' },
   { label: '按收藏量', value: 'favorites' }
+];
+
+const dateShortcuts = [
+  { text: '最近一周', value: () => { const d = new Date(); const w = new Date(d.getTime() - 7 * 86400000); return [w, d]; } },
+  { text: '最近一月', value: () => { const d = new Date(); const m = new Date(d.getTime() - 30 * 86400000); return [m, d]; } },
 ];
 
 function formatTime(value?: string) {
@@ -137,20 +170,37 @@ async function loadTaxonomy() {
 async function load() {
   loading.value = true;
   try {
-    const res = await api.get('/public/search', {
-      params: {
-        keyword: keyword.value || undefined,
-        categoryId: categoryId.value,
-        tagId: tagId.value,
-        sortBy: sortBy.value,
-        page: 1,
-        size: 20
-      }
-    });
-    list.value = (res.data.data || []).map((item: any) => ({
-      ...item,
-      authorName: item.authorName || item.nickname || item.username || item.authorId
-    }));
+    const params: any = {
+      keyword: keyword.value || undefined,
+      categoryId: categoryId.value,
+      tagId: tagId.value,
+      sortBy: sortBy.value,
+      page: page.value,
+      size: pageSize.value
+    };
+    if (dateRange.value && dateRange.value.length === 2) {
+      params.startDate = dateRange.value[0] + ' 00:00:00';
+      params.endDate = dateRange.value[1] + ' 23:59:59';
+    }
+    const res = await api.get('/public/search', { params });
+    const data = res.data.data;
+    // Handle new SearchResult format (items + totalCount + totalPages)
+    if (data && data.items !== undefined) {
+      list.value = data.items.map((item: any) => ({
+        ...item,
+        authorName: item.authorName || item.nickname || item.username || item.authorId
+      }));
+      totalCount.value = data.totalCount || 0;
+      totalPages.value = data.totalPages || 0;
+    } else {
+      // Fallback for old flat array response
+      list.value = (Array.isArray(data) ? data : []).map((item: any) => ({
+        ...item,
+        authorName: item.authorName || item.nickname || item.username || item.authorId
+      }));
+      totalCount.value = list.value.length;
+      totalPages.value = 1;
+    }
   } finally {
     loading.value = false;
   }
@@ -244,16 +294,26 @@ onMounted(async () => {
 }
 
 .filter-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 220px));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 18px;
+}
+
+.filter-row > * {
+  width: 200px;
 }
 
 .feed-list {
   display: grid;
   gap: 16px;
   margin-top: 20px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
 }
 
 .feed-card {

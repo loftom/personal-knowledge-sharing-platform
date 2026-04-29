@@ -60,6 +60,15 @@ public class ContentDtos {
     }
 
     @Data
+    public static class SearchResult {
+        private List<ContentListItem> items;
+        private long totalCount;
+        private int totalPages;
+        private int currentPage;
+        private int pageSize;
+    }
+
+    @Data
     public static class CommentRequest {
         @NotBlank
         private String body;
@@ -78,6 +87,7 @@ public class ContentDtos {
         private String body;
         private Long likeCount;
         private Integer status;
+        private Boolean isLiked;
         private LocalDateTime createdAt;
     }
 

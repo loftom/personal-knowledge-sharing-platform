@@ -192,12 +192,32 @@ public class ContentService {
         return content;
     }
 
-    public List<ContentDtos.ContentListItem> search(String keyword,
-                                                    Long categoryId,
-                                                    Long tagId,
-                                                    String sortBy,
-                                                    Integer page,
-                                                    Integer size) {
+    public ContentDtos.SearchResult search(String keyword,
+                                           Long categoryId,
+                                           Long tagId,
+                                           String sortBy,
+                                           LocalDateTime startDate,
+                                           LocalDateTime endDate,
+                                           Integer page,
+                                           Integer size) {
+        int safePage = Math.max(page == null ? 1 : page, 1);
+        int safeSize = Math.max(size == null ? 10 : size, 1);
+        Long currentUserId = UserContext.getUserId();
+
+        List<Content> all;
+
+        if (keyword != null && !keyword.isBlank()) {
+            // Use MySQL FULLTEXT when keyword is provided; fall back to LIKE on H2
+            try {
+                all = contentMapper.searchFulltext(keyword.trim(), categoryId, startDate, endDate, sortBy);
+                long totalCount = contentMapper.searchFulltextCount(keyword.trim(), categoryId, startDate, endDate);
+                all = all.stream().filter(c -> canViewContent(c, currentUserId)).toList();
+                return buildSearchResult(all, tagId, safePage, safeSize, totalCount);
+            } catch (Exception e) {
+                // Fallback to LIKE-based search (H2 or non-MySQL)
+            }
+        }
+
         LambdaQueryWrapper<Content> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Content::getStatus, "PUBLISHED");
         if (keyword != null && !keyword.isBlank()) {
@@ -205,6 +225,12 @@ public class ContentService {
         }
         if (categoryId != null) {
             wrapper.eq(Content::getCategoryId, categoryId);
+        }
+        if (startDate != null) {
+            wrapper.ge(Content::getPublishedAt, startDate);
+        }
+        if (endDate != null) {
+            wrapper.le(Content::getPublishedAt, endDate);
         }
         if ("likes".equalsIgnoreCase(sortBy)) {
             wrapper.orderByDesc(Content::getLikeCount);
@@ -216,10 +242,14 @@ public class ContentService {
             wrapper.orderByDesc(Content::getPublishedAt);
         }
 
-        List<Content> all = contentMapper.selectList(wrapper)
+        all = contentMapper.selectList(wrapper)
                 .stream()
-                .filter(content -> canViewContent(content, UserContext.getUserId()))
+                .filter(content -> canViewContent(content, currentUserId))
                 .toList();
+        return buildSearchResult(all, tagId, safePage, safeSize, null);
+    }
+
+    private ContentDtos.SearchResult buildSearchResult(List<Content> all, Long tagId, int page, int size, Long fulltextTotal) {
         if (tagId != null) {
             List<Long> taggedIds = contentTagMapper.selectList(new LambdaQueryWrapper<ContentTag>()
                             .eq(ContentTag::getTagId, tagId))
@@ -229,14 +259,25 @@ public class ContentService {
             all = all.stream().filter(c -> taggedIds.contains(c.getId())).toList();
         }
 
-        int safePage = Math.max(page == null ? 1 : page, 1);
-        int safeSize = Math.max(size == null ? 10 : size, 1);
-        int from = (safePage - 1) * safeSize;
+        long totalCount = fulltextTotal != null ? fulltextTotal : all.size();
+        int totalPages = (int) Math.ceil((double) totalCount / size);
+
+        int from = (page - 1) * size;
         if (from >= all.size()) {
-            return Collections.emptyList();
+            return buildResult(Collections.emptyList(), totalCount, totalPages, page, size);
         }
-        int to = Math.min(from + safeSize, all.size());
-        return all.subList(from, to).stream().map(this::toItem).collect(Collectors.toList());
+        int to = Math.min(from + size, all.size());
+        return buildResult(all.subList(from, to).stream().map(this::toItem).toList(), totalCount, totalPages, page, size);
+    }
+
+    private ContentDtos.SearchResult buildResult(List<ContentDtos.ContentListItem> items, long totalCount, int totalPages, int page, int size) {
+        ContentDtos.SearchResult result = new ContentDtos.SearchResult();
+        result.setItems(items);
+        result.setTotalCount(totalCount);
+        result.setTotalPages(totalPages);
+        result.setCurrentPage(page);
+        result.setPageSize(size);
+        return result;
     }
 
     public List<ContentDtos.ContentListItem> myContents(String status) {

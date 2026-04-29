@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.knowledge.platform.domain.mapper.ContentMapper">
+
+    <select id="searchFulltext" resultType="com.knowledge.platform.domain.entity.Content">
+        SELECT c.*, MATCH(c.title, c.body) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE) AS relevance
+        FROM content c
+        WHERE c.status = 'PUBLISHED'
+        AND MATCH(c.title, c.body) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        <if test="categoryId != null">
+            AND c.category_id = #{categoryId}
+        </if>
+        <if test="startDate != null">
+            AND c.published_at >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND c.published_at &lt;= #{endDate}
+        </if>
+        ORDER BY
+        <choose>
+            <when test="sortBy == 'likes'">c.like_count DESC</when>
+            <when test="sortBy == 'favorites'">c.favorite_count DESC</when>
+            <when test="sortBy == 'views'">c.view_count DESC</when>
+            <otherwise>relevance DESC, c.published_at DESC</otherwise>
+        </choose>
+    </select>
+
+    <select id="searchFulltextCount" resultType="long">
+        SELECT COUNT(*)
+        FROM content c
+        WHERE c.status = 'PUBLISHED'
+        AND MATCH(c.title, c.body) AGAINST(#{keyword} IN NATURAL LANGUAGE MODE)
+        <if test="categoryId != null">
+            AND c.category_id = #{categoryId}
+        </if>
+        <if test="startDate != null">
+            AND c.published_at >= #{startDate}
+        </if>
+        <if test="endDate != null">
+            AND c.published_at &lt;= #{endDate}
+        </if>
+    </select>
+
+</mapper>
