@@ -157,6 +157,7 @@ public class ContentService {
         }
     }
 
+    @Transactional
     public void delete(Long id) {
         Content db = contentMapper.selectById(id);
         if (db == null) {

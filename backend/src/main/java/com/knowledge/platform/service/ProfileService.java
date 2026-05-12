@@ -28,8 +28,10 @@ import com.knowledge.platform.domain.mapper.PointLogMapper;
 import com.knowledge.platform.domain.mapper.QaAnswerMapper;
 import com.knowledge.platform.domain.mapper.UserBehaviorEventMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
+import com.knowledge.platform.security.UserContext;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -129,6 +131,8 @@ public class ProfileService {
         simple.setId(user.getId());
         simple.setUsername(user.getUsername());
         simple.setNickname(user.getNickname());
+        simple.setAvatar(user.getAvatar());
+        simple.setBio(user.getBio());
         response.setUser(simple);
 
         Phase2Dtos.PersonalStats stats = new Phase2Dtos.PersonalStats();
@@ -163,6 +167,7 @@ public class ProfileService {
     }
 
     public Phase2Dtos.UserSimple updateNickname(Long userId, String nickname) {
+        requireOwnership(userId);
         User user = requireUser(userId);
         user.setNickname(nickname.trim());
         user.setUpdatedAt(LocalDateTime.now());
@@ -175,7 +180,24 @@ public class ProfileService {
         return simple;
     }
 
+    public void updateAvatar(Long userId, String avatarUrl) {
+        requireOwnership(userId);
+        User user = requireUser(userId);
+        user.setAvatar(avatarUrl);
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    public void updateBio(Long userId, String bio) {
+        requireOwnership(userId);
+        User user = requireUser(userId);
+        user.setBio(bio == null ? null : bio.trim());
+        user.setUpdatedAt(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
     public void resetPassword(Long userId, String newPassword) {
+        requireOwnership(userId);
         if (newPassword == null || newPassword.trim().length() < 6) {
             throw new AppException("新密码长度不能少于 6 位");
         }
@@ -185,7 +207,9 @@ public class ProfileService {
         userMapper.updateById(user);
     }
 
+    @Transactional
     public void deactivateAccount(Long userId) {
+        requireOwnership(userId);
         User user = requireUser(userId);
         if ("ADMIN".equalsIgnoreCase(user.getRole())) {
             throw new AppException("管理员账号不支持在前台直接注销");
@@ -230,6 +254,8 @@ public class ProfileService {
         pointLogMapper.delete(new LambdaQueryWrapper<PointLog>().eq(PointLog::getUserId, userId));
         badgeUserMapper.delete(new LambdaQueryWrapper<BadgeUser>().eq(BadgeUser::getUserId, userId));
 
+        user.setAvatar(null);
+        user.setBio(null);
         user.setNickname("已注销用户");
         user.setUsername("deleted_" + user.getId() + "_" + System.currentTimeMillis());
         user.setPasswordHash(encoder.encode(UUID.randomUUID().toString()));
@@ -246,6 +272,12 @@ public class ProfileService {
         return user;
     }
 
+    private void requireOwnership(Long userId) {
+        if (!userId.equals(UserContext.getUserId()) && !UserContext.isAdmin()) {
+            throw new AppException("无权操作其他用户");
+        }
+    }
+
     private List<Phase2Dtos.UserSimple> toUsers(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
@@ -258,6 +290,8 @@ public class ProfileService {
                 simple.setId(user.getId());
                 simple.setUsername(user.getUsername());
                 simple.setNickname(user.getNickname());
+                simple.setAvatar(user.getAvatar());
+                simple.setBio(user.getBio());
                 users.add(simple);
             }
         }

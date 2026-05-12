@@ -87,11 +87,13 @@ async function load() {
   loading.value = true;
   try {
     const res = await api.get('/recommend/feed');
-    list.value = (res.data.data || []).map((item: any) => ({
-      ...item,
-      id: item.contentId,
-      authorName: item.authorName || item.nickname || item.username || item.authorId
-    }));
+    list.value = (res.data.data || [])
+      .filter((item: any) => item.contentId != null)
+      .map((item: any) => ({
+        ...item,
+        id: item.contentId,
+        authorName: item.authorName || item.nickname || item.username || item.authorId
+      }));
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '加载推荐失败');
   } finally {

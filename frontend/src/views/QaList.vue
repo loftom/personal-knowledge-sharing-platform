@@ -112,18 +112,22 @@ function sanitizeTaxonomyName(value: string) {
 }
 
 async function loadTaxonomy() {
-  const [categoryRes, tagRes] = await Promise.all([
-    api.get('/public/taxonomy/categories'),
-    api.get('/public/taxonomy/tags')
-  ]);
-  categories.value = (categoryRes.data.data || []).map((item: any) => ({
-    ...item,
-    name: sanitizeTaxonomyName(item.name)
-  }));
-  tags.value = (tagRes.data.data || []).map((item: any) => ({
-    ...item,
-    name: sanitizeTaxonomyName(item.name)
-  }));
+  try {
+    const [categoryRes, tagRes] = await Promise.all([
+      api.get('/public/taxonomy/categories'),
+      api.get('/public/taxonomy/tags')
+    ]);
+    categories.value = (categoryRes.data.data || []).map((item: any) => ({
+      ...item,
+      name: sanitizeTaxonomyName(item.name)
+    }));
+    tags.value = (tagRes.data.data || []).map((item: any) => ({
+      ...item,
+      name: sanitizeTaxonomyName(item.name)
+    }));
+  } catch {
+    // taxonomy load failure is non-blocking
+  }
 }
 
 async function load() {

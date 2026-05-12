@@ -16,10 +16,17 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/uploads")
 public class UploadController {
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg",
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+        ".txt", ".md", ".csv", ".json", ".xml", ".zip", ".rar"
+    );
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UploadResult> upload(@RequestParam("file") MultipartFile file, HttpServletRequest request) throws IOException {
@@ -30,15 +37,19 @@ public class UploadController {
             return new ApiResponse<>(-1, "file too large", null);
         }
 
+        String original = sanitizeFilename(file.getOriginalFilename());
+        String suffix = "";
+        if (original != null && original.contains(".")) {
+            suffix = original.substring(original.lastIndexOf('.')).toLowerCase(Locale.ROOT);
+        }
+        if (!ALLOWED_EXTENSIONS.contains(suffix)) {
+            return new ApiResponse<>(-1, "file type not allowed", null);
+        }
+
         String uploadsDir = "uploads";
         File dir = new File(uploadsDir);
         if (!dir.exists()) dir.mkdirs();
 
-        String original = sanitizeFilename(file.getOriginalFilename());
-        String suffix = "";
-        if (original != null && original.contains(".")) {
-            suffix = original.substring(original.lastIndexOf('.'));
-        }
         String filename = Instant.now().toEpochMilli() + "_" + Math.abs(original == null ? filenameHash() : original.hashCode()) + suffix;
 
         Path target = Path.of(uploadsDir, filename);
@@ -50,7 +61,7 @@ public class UploadController {
         String contentType = file.getContentType() == null ? "" : file.getContentType();
         String kind = isImage(contentType, suffix) ? "image" : "file";
 
-        return new ApiResponse<>(0, "OK", new UploadResult(
+        return ApiResponse.ok(new UploadResult(
                 original == null || original.isBlank() ? filename : original,
                 url,
                 contentType,

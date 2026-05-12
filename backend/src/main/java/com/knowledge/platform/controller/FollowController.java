@@ -1,6 +1,7 @@
 package com.knowledge.platform.controller;
 
 import com.knowledge.platform.common.ApiResponse;
+import com.knowledge.platform.domain.dto.ContentDtos;
 import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.security.UserContext;
 import com.knowledge.platform.service.FollowService;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -40,5 +42,12 @@ public class FollowController {
     @GetMapping("/following")
     public ApiResponse<List<Phase2Dtos.UserSimple>> myFollowing() {
         return ApiResponse.ok(profileService.followings(UserContext.getUserId()));
+    }
+
+    @GetMapping("/feed")
+    public ApiResponse<List<ContentDtos.ContentListItem>> feed(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(followService.feed(Math.max(1, page), Math.min(Math.max(1, size), 50)));
     }
 }

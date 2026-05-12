@@ -94,12 +94,16 @@ const tagForm = reactive({
 });
 
 async function load() {
-  const [categoryRes, tagRes] = await Promise.all([
-    api.get('/public/taxonomy/categories'),
-    api.get('/public/taxonomy/tags')
-  ]);
-  categories.value = categoryRes.data.data || [];
-  tags.value = tagRes.data.data || [];
+  try {
+    const [categoryRes, tagRes] = await Promise.all([
+      api.get('/public/taxonomy/categories'),
+      api.get('/public/taxonomy/tags')
+    ]);
+    categories.value = categoryRes.data.data || [];
+    tags.value = tagRes.data.data || [];
+  } catch {
+    // load failure is non-blocking
+  }
 }
 
 async function submitCategory() {

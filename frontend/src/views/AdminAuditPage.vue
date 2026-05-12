@@ -74,7 +74,7 @@
           类型：{{ previewItem.type }} · 作者：{{ previewItem.authorName || `用户 ${previewItem.authorId}` }} · 状态：{{ statusLabel(previewItem.status) }}
         </p>
         <p v-if="previewItem.summary" class="preview-summary">{{ previewItem.summary }}</p>
-        <div class="preview-body" v-html="previewItem.body || '暂无正文内容'"></div>
+        <div class="preview-body" v-html="sanitizeHtml(previewItem.body || '暂无正文内容')"></div>
       </template>
     </el-dialog>
 
@@ -100,6 +100,7 @@
 import { onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import api from '../api';
+import { sanitizeHtml } from '../utils/sanitize';
 
 const list = ref<any[]>([]);
 const loading = ref(false);

@@ -315,7 +315,8 @@ async function login(account?: { username: string; password: string }) {
     window.dispatchEvent(new Event('auth-change'));
     window.dispatchEvent(new Event('login-shortcuts-change'));
     ElMessage.success('登录成功');
-    router.push(String(route.query.redirect || '/'));
+    const redirect = route.query.redirect;
+    router.push(typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/');
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '登录失败');
   } finally {

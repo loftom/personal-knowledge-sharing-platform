@@ -104,6 +104,8 @@ public class Phase2Dtos {
         private Long id;
         private String username;
         private String nickname;
+        private String avatar;
+        private String bio;
     }
 
     @Data
@@ -323,5 +325,32 @@ public class Phase2Dtos {
         @NotBlank
         private String status;
         private String reason;
+    }
+
+    @Data
+    public static class ContentInfluenceItem {
+        private Long contentId;
+        private String title;
+        private String type;
+        private Long viewCount;
+        private Long likeCount;
+        private Long favoriteCount;
+        private Long commentCount;
+        private Double influenceScore;
+        private LocalDateTime publishedAt;
+    }
+
+    @Data
+    public static class InfluenceReportResponse {
+        private Long userId;
+        private Long publishedContentCount;
+        private List<ContentInfluenceItem> items;
+        private ContentInfluenceItem bestPerformer;
+        private Long totalViews;
+        private Long totalLikes;
+        private Long totalFavorites;
+        private Double avgInfluenceScore;
+        private String bestCategory;
+        private String bestTag;
     }
 }

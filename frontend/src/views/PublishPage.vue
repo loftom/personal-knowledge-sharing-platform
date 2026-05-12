@@ -301,19 +301,24 @@ function insertBlockAtCursor(type: string) {
 }
 
 async function loadTaxonomy() {
-  const [categoryRes, tagRes] = await Promise.all([
-    api.get('/public/taxonomy/categories'),
-    api.get('/public/taxonomy/tags')
-  ]);
+  try {
+    const [categoryRes, tagRes] = await Promise.all([
+      api.get('/public/taxonomy/categories'),
+      api.get('/public/taxonomy/tags')
+    ]);
 
-  categories.value = (categoryRes.data.data || []).map((item: any) => ({
-    ...item,
-    name: sanitizeTaxonomyName(item.name)
-  }));
-  tags.value = (tagRes.data.data || []).map((item: any) => ({
-    ...item,
-    name: sanitizeTaxonomyName(item.name)
-  }));
+    categories.value = (categoryRes.data.data || []).map((item: any) => ({
+      ...item,
+      name: sanitizeTaxonomyName(item.name)
+    }));
+    tags.value = (tagRes.data.data || []).map((item: any) => ({
+      ...item,
+      name: sanitizeTaxonomyName(item.name)
+    }));
+  } catch {
+    // taxonomy load failure is non-blocking
+    return;
+  }
 
   if (!form.categoryId && categories.value.length > 0) {
     form.categoryId = categories.value[0].id;

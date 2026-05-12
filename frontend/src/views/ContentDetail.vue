@@ -27,7 +27,7 @@
               </p>
             </header>
 
-            <section class="article-body" v-html="content.body"></section>
+            <section class="article-body" v-html="safeBody"></section>
           </article>
 
           <section class="comment-shell">
@@ -243,6 +243,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
 import api from '../api';
+import { sanitizeHtml } from '../utils/sanitize';
 
 type AttachmentItem = {
   name: string;
@@ -255,6 +256,7 @@ const router = useRouter();
 const id = route.params.id as string;
 
 const content = ref<any>(null);
+const safeBody = computed(() => sanitizeHtml(content.value?.body || ''));
 const comments = ref<any[]>([]);
 const commentBody = ref('');
 const replyBody = ref('');

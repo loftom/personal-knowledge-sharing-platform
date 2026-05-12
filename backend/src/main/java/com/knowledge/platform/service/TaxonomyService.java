@@ -4,8 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.knowledge.platform.common.AppException;
 import com.knowledge.platform.domain.dto.Phase2Dtos;
 import com.knowledge.platform.domain.entity.Category;
+import com.knowledge.platform.domain.entity.Content;
+import com.knowledge.platform.domain.entity.ContentTag;
 import com.knowledge.platform.domain.entity.Tag;
 import com.knowledge.platform.domain.mapper.CategoryMapper;
+import com.knowledge.platform.domain.mapper.ContentMapper;
+import com.knowledge.platform.domain.mapper.ContentTagMapper;
 import com.knowledge.platform.domain.mapper.TagMapper;
 import org.springframework.stereotype.Service;
 
@@ -16,10 +20,15 @@ public class TaxonomyService {
 
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
+    private final ContentMapper contentMapper;
+    private final ContentTagMapper contentTagMapper;
 
-    public TaxonomyService(CategoryMapper categoryMapper, TagMapper tagMapper) {
+    public TaxonomyService(CategoryMapper categoryMapper, TagMapper tagMapper,
+                          ContentMapper contentMapper, ContentTagMapper contentTagMapper) {
         this.categoryMapper = categoryMapper;
         this.tagMapper = tagMapper;
+        this.contentMapper = contentMapper;
+        this.contentTagMapper = contentTagMapper;
     }
 
     public List<Phase2Dtos.CategoryOption> categories() {
@@ -76,5 +85,75 @@ public class TaxonomyService {
         tag.setName(request.getName());
         tagMapper.insert(tag);
         return tag.getId();
+    }
+
+    public void updateCategory(Long id, Phase2Dtos.CreateCategoryRequest request) {
+        Category category = categoryMapper.selectById(id);
+        if (category == null) {
+            throw new AppException("分类不存在");
+        }
+        if (request.getName() != null && !request.getName().isBlank()) {
+            Category existing = categoryMapper.selectOne(new LambdaQueryWrapper<Category>()
+                    .eq(Category::getName, request.getName())
+                    .ne(Category::getId, id));
+            if (existing != null) {
+                throw new AppException("分类名称已存在");
+            }
+            category.setName(request.getName());
+        }
+        if (request.getParentId() != null) {
+            category.setParentId(request.getParentId());
+        }
+        if (request.getSort() != null) {
+            category.setSort(request.getSort());
+        }
+        if (request.getEnabled() != null) {
+            category.setEnabled(request.getEnabled());
+        }
+        categoryMapper.updateById(category);
+    }
+
+    public void deleteCategory(Long id) {
+        Category category = categoryMapper.selectById(id);
+        if (category == null) {
+            throw new AppException("分类不存在");
+        }
+        long useCount = contentMapper.selectCount(new LambdaQueryWrapper<Content>()
+                .eq(Content::getCategoryId, id)
+                .eq(Content::getStatus, "PUBLISHED"));
+        if (useCount > 0) {
+            throw new AppException("该分类下有已发布内容，无法删除");
+        }
+        categoryMapper.deleteById(id);
+    }
+
+    public void updateTag(Long id, Phase2Dtos.CreateTagRequest request) {
+        Tag tag = tagMapper.selectById(id);
+        if (tag == null) {
+            throw new AppException("标签不存在");
+        }
+        if (request.getName() != null && !request.getName().isBlank()) {
+            Tag existing = tagMapper.selectOne(new LambdaQueryWrapper<Tag>()
+                    .eq(Tag::getName, request.getName())
+                    .ne(Tag::getId, id));
+            if (existing != null) {
+                throw new AppException("标签名称已存在");
+            }
+            tag.setName(request.getName());
+        }
+        tagMapper.updateById(tag);
+    }
+
+    public void deleteTag(Long id) {
+        Tag tag = tagMapper.selectById(id);
+        if (tag == null) {
+            throw new AppException("标签不存在");
+        }
+        long useCount = contentTagMapper.selectCount(new LambdaQueryWrapper<ContentTag>()
+                .eq(ContentTag::getTagId, id));
+        if (useCount > 0) {
+            throw new AppException("该标签已被内容使用，无法删除");
+        }
+        tagMapper.deleteById(id);
     }
 }

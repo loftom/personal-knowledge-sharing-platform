@@ -8,17 +8,14 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("user")
-public class User {
+@TableName("redeem_item")
+public class RedeemItem {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String username;
-    private String passwordHash;
-    private String nickname;
-    private String avatar;
-    private String bio;
-    private String role;
-    private Integer status;
+    private String name;
+    private String description;
+    private Integer pointCost;
+    private String icon;
+    private Integer enabled;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

@@ -91,6 +91,12 @@ function clearAuthState() {
   localStorage.removeItem('nickname');
   localStorage.removeItem('username');
   localStorage.removeItem('role');
+  // Also clear prefixed keys set by auth utility
+  localStorage.removeItem('user:token');
+  localStorage.removeItem('user:userId');
+  localStorage.removeItem('user:nickname');
+  localStorage.removeItem('user:username');
+  localStorage.removeItem('user:role');
   window.dispatchEvent(new Event('auth-change'));
 }
 

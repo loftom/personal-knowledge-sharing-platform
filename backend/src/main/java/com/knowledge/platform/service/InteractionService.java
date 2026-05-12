@@ -40,6 +40,7 @@ public class InteractionService {
     private final BehaviorService behaviorService;
     private final NotificationService notificationService;
     private final PointService pointService;
+    private final AuditService auditService;
 
     public InteractionService(LikeRecordMapper likeRecordMapper,
                               FavoriteRecordMapper favoriteRecordMapper,
@@ -49,7 +50,8 @@ public class InteractionService {
                               UserMapper userMapper,
                               BehaviorService behaviorService,
                               NotificationService notificationService,
-                              PointService pointService) {
+                              PointService pointService,
+                              AuditService auditService) {
         this.likeRecordMapper = likeRecordMapper;
         this.favoriteRecordMapper = favoriteRecordMapper;
         this.commentMapper = commentMapper;
@@ -59,6 +61,7 @@ public class InteractionService {
         this.behaviorService = behaviorService;
         this.notificationService = notificationService;
         this.pointService = pointService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -143,7 +146,12 @@ public class InteractionService {
         return false;
     }
 
+    @Transactional
     public Long comment(Long contentId, ContentDtos.CommentRequest request) {
+        String hit = auditService.hitSensitiveWord(request.getBody());
+        if (hit != null) {
+            throw new AppException("评论包含敏感词");
+        }
         Content content = contentMapper.selectById(contentId);
         if (!canInteractWithContent(content, UserContext.getUserId())) {
             throw new AppException("Content is not commentable");
@@ -210,6 +218,10 @@ public class InteractionService {
         }
         if (newBody == null || newBody.isBlank()) {
             throw new AppException("评论内容不能为空");
+        }
+        String hit = auditService.hitSensitiveWord(newBody);
+        if (hit != null) {
+            throw new AppException("评论包含敏感词");
         }
         comment.setBody(newBody.trim());
         commentMapper.updateById(comment);

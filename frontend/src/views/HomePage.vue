@@ -19,7 +19,14 @@
     <section class="home-panel">
       <div class="panel-top">
         <div>
-          <h2>内容列表</h2>
+          <div class="feed-tabs">
+            <button :class="['feed-tab', { active: feedMode === 'discover' }]" @click="switchFeedMode('discover')">
+              发现
+            </button>
+            <button :class="['feed-tab', { active: feedMode === 'following' }]" @click="switchFeedMode('following')">
+              关注
+            </button>
+          </div>
           <p>以信息流方式展示社区内容，突出标题、摘要、作者与互动指标，提升浏览与筛选效率。</p>
         </div>
         <div class="search-box">
@@ -32,14 +39,14 @@
         </div>
       </div>
 
-      <div class="filter-row">
-        <el-select v-model="categoryId" clearable placeholder="全部分类" @change="load">
+      <div class="filter-row" v-if="feedMode === 'discover'">
+        <el-select v-model="categoryId" clearable placeholder="全部分类" @change="resetAndLoad">
           <el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
         </el-select>
-        <el-select v-model="tagId" clearable placeholder="全部标签" @change="load">
+        <el-select v-model="tagId" clearable placeholder="全部标签" @change="resetAndLoad">
           <el-option v-for="item in tags" :key="item.id" :label="item.name" :value="item.id" />
         </el-select>
-        <el-select v-model="sortBy" placeholder="排序方式" @change="load">
+        <el-select v-model="sortBy" placeholder="排序方式" @change="resetAndLoad">
           <el-option v-for="item in sortOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-date-picker
@@ -52,7 +59,7 @@
           value-format="YYYY-MM-DD"
           :shortcuts="dateShortcuts"
           style="width: 260px"
-          @change="load"
+          @change="resetAndLoad"
         />
       </div>
 
@@ -115,6 +122,7 @@ import { onMounted, ref } from 'vue';
 import dayjs from 'dayjs';
 import api from '../api';
 
+const feedMode = ref<'discover' | 'following'>('discover');
 const keyword = ref('');
 const categoryId = ref<number | undefined>();
 const tagId = ref<number | undefined>();
@@ -128,6 +136,7 @@ const list = ref<any[]>([]);
 const categories = ref<any[]>([]);
 const tags = ref<any[]>([]);
 const loading = ref(false);
+const followingPage = ref(1);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const sortOptions = [
@@ -153,18 +162,38 @@ function sanitizeTaxonomyName(value: string) {
 }
 
 async function loadTaxonomy() {
-  const [categoryRes, tagRes] = await Promise.all([
-    api.get('/public/taxonomy/categories'),
-    api.get('/public/taxonomy/tags')
-  ]);
-  categories.value = (categoryRes.data.data || []).map((item: any) => ({
-    ...item,
-    name: sanitizeTaxonomyName(item.name)
-  }));
-  tags.value = (tagRes.data.data || []).map((item: any) => ({
-    ...item,
-    name: sanitizeTaxonomyName(item.name)
-  }));
+  try {
+    const [categoryRes, tagRes] = await Promise.all([
+      api.get('/public/taxonomy/categories'),
+      api.get('/public/taxonomy/tags')
+    ]);
+    categories.value = (categoryRes.data.data || []).map((item: any) => ({
+      ...item,
+      name: sanitizeTaxonomyName(item.name)
+    }));
+    tags.value = (tagRes.data.data || []).map((item: any) => ({
+      ...item,
+      name: sanitizeTaxonomyName(item.name)
+    }));
+  } catch {
+    // taxonomy load failure is non-blocking
+  }
+}
+
+function resetAndLoad() {
+  page.value = 1;
+  if (feedMode.value === 'discover') {
+    load();
+  }
+}
+
+function switchFeedMode(mode: 'discover' | 'following') {
+  feedMode.value = mode;
+  if (mode === 'discover') {
+    load();
+  } else {
+    loadFollowing();
+  }
 }
 
 async function load() {
@@ -184,7 +213,6 @@ async function load() {
     }
     const res = await api.get('/public/search', { params });
     const data = res.data.data;
-    // Handle new SearchResult format (items + totalCount + totalPages)
     if (data && data.items !== undefined) {
       list.value = data.items.map((item: any) => ({
         ...item,
@@ -193,7 +221,6 @@ async function load() {
       totalCount.value = data.totalCount || 0;
       totalPages.value = data.totalPages || 0;
     } else {
-      // Fallback for old flat array response
       list.value = (Array.isArray(data) ? data : []).map((item: any) => ({
         ...item,
         authorName: item.authorName || item.nickname || item.username || item.authorId
@@ -201,6 +228,27 @@ async function load() {
       totalCount.value = list.value.length;
       totalPages.value = 1;
     }
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadFollowing() {
+  loading.value = true;
+  try {
+    const res = await api.get('/follow/feed', {
+      params: { page: followingPage.value, size: pageSize.value }
+    });
+    list.value = (res.data.data || []).map((item: any) => ({
+      ...item,
+      authorName: item.authorName || item.nickname || item.username || item.authorId
+    }));
+    totalCount.value = list.value.length;
+    totalPages.value = list.value.length >= pageSize.value ? followingPage.value + 1 : followingPage.value;
+  } catch {
+    list.value = [];
+    totalCount.value = 0;
+    totalPages.value = 0;
   } finally {
     loading.value = false;
   }
@@ -269,6 +317,34 @@ onMounted(async () => {
 
 .home-panel {
   padding: 24px;
+}
+
+.feed-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.feed-tab {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.feed-tab.active {
+  background: #1677ff;
+  color: #fff;
+}
+
+.feed-tab:hover:not(.active) {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .panel-top {

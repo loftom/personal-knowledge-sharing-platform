@@ -17,6 +17,7 @@ import com.knowledge.platform.domain.mapper.TagMapper;
 import com.knowledge.platform.domain.mapper.UserMapper;
 import com.knowledge.platform.security.UserContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -176,6 +177,7 @@ public class AdminService {
         return result;
     }
 
+    @Transactional
     public void approve(Long contentId) {
         requireAdmin();
         Content content = contentMapper.selectById(contentId);
@@ -195,6 +197,7 @@ public class AdminService {
         saveAudit(contentId, "APPROVE", "Audit passed");
     }
 
+    @Transactional
     public void reject(Long contentId, String reason) {
         requireAdmin();
         Content content = contentMapper.selectById(contentId);
@@ -209,8 +212,10 @@ public class AdminService {
         content.setUpdatedAt(LocalDateTime.now());
         contentMapper.updateById(content);
         saveAudit(contentId, "REJECT", reason == null ? "Audit rejected" : reason);
+        notificationService.notifyContentRejected(content, reason);
     }
 
+    @Transactional
     public void offline(Long contentId, String reason) {
         requireAdmin();
         Content content = contentMapper.selectById(contentId);
@@ -225,6 +230,7 @@ public class AdminService {
         contentMapper.updateById(content);
         pointService.penalizeOffline(content.getAuthorId(), content.getId());
         saveAudit(contentId, "OFFLINE", reason == null ? "Admin offline" : reason);
+        notificationService.notifyContentOffline(content, reason);
     }
 
     public List<Phase2Dtos.AdminUserItem> users(String keyword, Integer status) {
@@ -313,6 +319,7 @@ public class AdminService {
         }).toList();
     }
 
+    @Transactional
     public void updateContentStatus(Long contentId, String nextStatus, String reason) {
         requireAdmin();
         if (nextStatus == null || nextStatus.isBlank()) {
@@ -339,6 +346,10 @@ public class AdminService {
 
         if ("OFFLINE".equals(status) && "PUBLISHED".equals(previousStatus)) {
             pointService.penalizeOffline(content.getAuthorId(), content.getId());
+            notificationService.notifyContentOffline(content, reason);
+        }
+        if ("REJECTED".equals(status) && !"REJECTED".equals(previousStatus)) {
+            notificationService.notifyContentRejected(content, reason);
         }
         saveAudit(contentId, "MANAGE_STATUS", (reason == null || reason.isBlank()) ? ("Set status to " + status) : reason);
     }

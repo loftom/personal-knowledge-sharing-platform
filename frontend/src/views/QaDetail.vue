@@ -13,7 +13,7 @@
               <span>问题状态：{{ statusLabel(question.status) }}</span>
               <span v-if="question.bestAnswerId">已采纳最佳答案</span>
             </div>
-            <div class="hero-desc" v-html="question.content"></div>
+            <div class="hero-desc" v-html="safeQuestionContent"></div>
           </div>
 
           <div class="status-card">
@@ -44,7 +44,7 @@
         <div v-if="answers.length" class="answer-list">
           <article v-for="answer in answers" :key="answer.id" :class="['answer-card', { best: answer.isBest }]">
             <div v-if="answer.isBest" class="best-banner">最佳答案</div>
-            <div class="answer-body" v-html="answer.body"></div>
+            <div class="answer-body" v-html="sanitizeHtml(answer.body)"></div>
             <div class="answer-meta">
               <span>回答者：{{ answer.displayName || answer.nickname || `用户 ${answer.userId}` }}</span>
               <span>{{ formatTime(answer.createdAt) }}</span>
@@ -107,12 +107,14 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
 import api from '../api';
+import { sanitizeHtml } from '../utils/sanitize';
 
 const route = useRoute();
 const router = useRouter();
 const id = route.params.id as string;
 
 const question = ref<any>(null);
+const safeQuestionContent = computed(() => sanitizeHtml(question.value?.content || ''));
 const answers = ref<any[]>([]);
 const newAnswer = ref('');
 const loading = ref(false);

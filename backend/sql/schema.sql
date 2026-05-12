@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS user (
     username VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(64) NOT NULL,
+    avatar VARCHAR(500) NULL,
+    bio VARCHAR(500) NULL,
     role VARCHAR(16) NOT NULL DEFAULT 'USER',
     status TINYINT NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
@@ -196,4 +198,25 @@ CREATE TABLE IF NOT EXISTS badge_user (
     badge_name VARCHAR(128) NOT NULL,
     awarded_at DATETIME NOT NULL,
     UNIQUE KEY uk_badge_user(user_id, badge_code)
+);
+
+CREATE TABLE IF NOT EXISTS redeem_item (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(128) NOT NULL,
+    description VARCHAR(500) NULL,
+    point_cost INT NOT NULL,
+    icon VARCHAR(64) NULL,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS redeem_record (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    item_id BIGINT NOT NULL,
+    item_name VARCHAR(128) NOT NULL,
+    point_cost INT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED',
+    created_at DATETIME NOT NULL,
+    INDEX idx_redeem_record_user(user_id)
 );

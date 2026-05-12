@@ -32,9 +32,11 @@ api.interceptors.response.use(
       if (isAdminPath()) {
         clearAdminAuth();
         window.dispatchEvent(new Event('admin-auth-change'));
+        window.location.href = '/login?mode=admin';
       } else {
         clearUserAuth();
         window.dispatchEvent(new Event('auth-change'));
+        window.location.href = '/login?reason=login-required&redirect=' + encodeURIComponent(window.location.pathname);
       }
     }
     return Promise.reject(error);

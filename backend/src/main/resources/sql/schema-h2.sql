@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS user (
     username VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(64) NOT NULL,
+    avatar VARCHAR(500) NULL,
+    bio VARCHAR(500) NULL,
     role VARCHAR(16) NOT NULL DEFAULT 'USER',
     status TINYINT NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL,
@@ -193,3 +195,39 @@ CREATE TABLE IF NOT EXISTS badge_user (
     awarded_at TIMESTAMP NOT NULL,
     CONSTRAINT uk_badge_user UNIQUE (user_id, badge_code)
 );
+
+CREATE TABLE IF NOT EXISTS private_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sender_user_id BIGINT NOT NULL,
+    receiver_user_id BIGINT NOT NULL,
+    content VARCHAR(1000) NOT NULL,
+    is_read TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL,
+    read_at TIMESTAMP NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_private_message_sender ON private_message(sender_user_id);
+CREATE INDEX IF NOT EXISTS idx_private_message_receiver ON private_message(receiver_user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_private_message_created ON private_message(created_at);
+
+CREATE TABLE IF NOT EXISTS redeem_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description VARCHAR(500) NULL,
+    point_cost INT NOT NULL,
+    icon VARCHAR(64) NULL,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS redeem_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    item_id BIGINT NOT NULL,
+    item_name VARCHAR(128) NOT NULL,
+    point_cost INT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED',
+    created_at TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_redeem_record_user ON redeem_record(user_id);

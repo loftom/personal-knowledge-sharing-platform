@@ -40,6 +40,40 @@ public class NotificationService {
         this.realtimePushService = realtimePushService;
     }
 
+    public void notifyContentRejected(Content content, String reason) {
+        if (content == null || content.getAuthorId() == null) return;
+        Notification n = new Notification();
+        n.setUserId(content.getAuthorId());
+        n.setType("CONTENT_REJECTED");
+        n.setTitle("你的内容未通过审核");
+        n.setContent(content.getTitle() + (reason != null && !reason.isBlank() ? " - " + reason : ""));
+        n.setRelatedId(content.getId());
+        n.setIsRead(0);
+        n.setCreatedAt(LocalDateTime.now());
+        notificationMapper.insert(n);
+        realtimePushService.pushAfterCommit(n.getUserId(), "notification", Map.of(
+            "notificationType", n.getType(),
+            "relatedId", n.getRelatedId()
+        ));
+    }
+
+    public void notifyContentOffline(Content content, String reason) {
+        if (content == null || content.getAuthorId() == null) return;
+        Notification n = new Notification();
+        n.setUserId(content.getAuthorId());
+        n.setType("CONTENT_OFFLINE");
+        n.setTitle("你的内容已被下架");
+        n.setContent(content.getTitle() + (reason != null && !reason.isBlank() ? " - " + reason : ""));
+        n.setRelatedId(content.getId());
+        n.setIsRead(0);
+        n.setCreatedAt(LocalDateTime.now());
+        notificationMapper.insert(n);
+        realtimePushService.pushAfterCommit(n.getUserId(), "notification", Map.of(
+            "notificationType", n.getType(),
+            "relatedId", n.getRelatedId()
+        ));
+    }
+
     public void notifyBestAnswer(QaAnswer answer, Content content) {
         if (answer == null || content == null) return;
         Notification n = new Notification();

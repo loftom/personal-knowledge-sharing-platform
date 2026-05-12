@@ -133,6 +133,58 @@
         </div>
 
         <div class="trend-section">
+          <div class="trend-head">
+            <h3>内容影响力分析</h3>
+            <p>基于阅读量、点赞、收藏和评论的综合影响力评分。</p>
+          </div>
+          <div v-if="influenceReport" class="influence-body">
+            <div class="influence-summary">
+              <div class="influence-stat">
+                <span>内容总数</span>
+                <strong>{{ influenceReport.publishedContentCount || 0 }}</strong>
+              </div>
+              <div class="influence-stat">
+                <span>平均影响力分</span>
+                <strong>{{ influenceReport.avgInfluenceScore || 0 }}</strong>
+              </div>
+              <div class="influence-stat">
+                <span>最佳分类</span>
+                <strong>{{ influenceReport.bestCategory || '-' }}</strong>
+              </div>
+              <div class="influence-stat">
+                <span>最多使用标签</span>
+                <strong>{{ influenceReport.bestTag || '-' }}</strong>
+              </div>
+            </div>
+            <div v-if="influenceReport.bestPerformer" class="best-performer">
+              <span class="best-badge">最佳表现</span>
+              <strong>{{ influenceReport.bestPerformer.title }}</strong>
+              <span class="best-score">影响力 {{ influenceReport.bestPerformer.influenceScore }}</span>
+            </div>
+            <el-table :data="influenceReport.items || []" stripe size="small" max-height="400">
+              <el-table-column prop="title" label="内容标题" min-width="200" show-overflow-tooltip />
+              <el-table-column prop="type" label="类型" width="80">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.type === 'ARTICLE' ? 'primary' : row.type === 'TUTORIAL' ? 'success' : 'warning'">
+                    {{ row.type === 'ARTICLE' ? '文章' : row.type === 'TUTORIAL' ? '教程' : '问答' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="viewCount" label="阅读" width="80" sortable />
+              <el-table-column prop="likeCount" label="点赞" width="80" sortable />
+              <el-table-column prop="favoriteCount" label="收藏" width="80" sortable />
+              <el-table-column prop="commentCount" label="评论" width="80" sortable />
+              <el-table-column prop="influenceScore" label="影响力分" width="110" sortable>
+                <template #default="{ row }">
+                  <span class="influence-score-value">{{ row.influenceScore }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <el-empty v-else-if="!influenceLoading" description="暂无影响力数据" />
+        </div>
+
+        <div class="trend-section">
           <h3>最近积分流水</h3>
           <el-timeline v-if="(report.recentPointLogs || []).length > 0">
             <el-timeline-item v-for="item in report.recentPointLogs" :key="item.id" :timestamp="formatTime(item.createdAt)">
@@ -159,6 +211,8 @@ import api from '../api';
 
 const report = ref<any>(null);
 const loading = ref(false);
+const influenceReport = ref<any>(null);
+const influenceLoading = ref(false);
 
 const trends = computed(() => report.value?.trends || []);
 const maxViews = computed(() => Math.max(...trends.value.map((item: any) => item.views || 0), 1));
@@ -200,7 +254,7 @@ const viewPoints = computed(() => {
   });
 });
 
-const viewPolyline = computed(() => viewPoints.value.map((point) => `${point.x},${point.y}`).join(' '));
+const viewPolyline = computed(() => viewPoints.value.map((point: { x: number; y: number }) => `${point.x},${point.y}`).join(' '));
 
 const trendSummary = computed(() => {
   const items = trends.value;
@@ -233,13 +287,19 @@ function formatTime(value?: string) {
 
 async function load() {
   loading.value = true;
+  influenceLoading.value = true;
   try {
-    const res = await api.get('/profile/me/report');
-    report.value = res.data.data || null;
+    const [reportRes, influenceRes] = await Promise.all([
+      api.get('/profile/me/report'),
+      api.get('/profile/me/influence-report')
+    ]);
+    report.value = reportRes.data.data || null;
+    influenceReport.value = influenceRes.data.data || null;
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.message || e.message || '加载报告失败');
   } finally {
     loading.value = false;
+    influenceLoading.value = false;
   }
 }
 
@@ -294,6 +354,16 @@ onMounted(load);
 .line-chart { width:100%; height:220px; background:linear-gradient(180deg,#f8fbff 0%,#ffffff 100%); border-radius:14px; }
 .point-log-line { display:flex; gap:10px; align-items:center; }
 .gain { color:#16a34a; } .loss { color:#dc2626; }
+.influence-body { display:grid; gap:16px; }
+.influence-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.influence-stat { padding:14px; border-radius:14px; background:linear-gradient(135deg, rgba(59,130,246,.08), rgba(139,92,246,.06)); text-align:center; }
+.influence-stat span { color:#64748b; font-size:13px; display:block; }
+.influence-stat strong { display:block; margin-top:8px; font-size:22px; color:#0f172a; }
+.best-performer { display:flex; align-items:center; gap:12px; padding:14px 18px; border-radius:14px; background:linear-gradient(135deg, #fef3c7, #fde68a); }
+.best-badge { background:#d97706; color:#fff; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700; }
+.best-performer strong { flex:1; color:#0f172a; font-size:16px; }
+.best-score { color:#92400e; font-weight:700; }
+.influence-score-value { color:#1d4ed8; font-weight:700; }
 @media (max-width: 920px) {
   .stat-grid, .summary-grid, .insight-grid { grid-template-columns:1fr; }
   .chart-grid { grid-template-columns:1fr; }
