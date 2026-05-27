@@ -108,6 +108,27 @@ powershell -ExecutionPolicy Bypass -File .\scripts\seed_recommendation_data.ps1
 
 ## 演示账号
 
+登录页的快捷账号列表默认隐藏，避免演示账号长期直接暴露在界面上。
+如需在演示或测试时临时打开快捷账号体验，可以进入登录页后打开浏览器控制台，执行：
+
+```javascript
+loginShortcuts.enable()
+```
+
+关闭快捷账号列表：
+
+```javascript
+loginShortcuts.disable()
+```
+
+查看当前开关状态：
+
+```javascript
+loginShortcuts.status()
+```
+
+该开关状态会保存在浏览器 `localStorage` 中，刷新页面后仍会保持。
+
 ### 基础演示账号
 
 执行 `scripts/setup_demo_environment.ps1` 后可用：
